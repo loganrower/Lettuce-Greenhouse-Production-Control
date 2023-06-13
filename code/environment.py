@@ -46,7 +46,16 @@ class LettuceGreenhouse(gym.Env):
         self.N = self.L//self.h ## 192... steps?
 
         # action and observation spaces
+        ## action space
+        ###continuous range of actions
+        ### upper and lower values are specified as -1 and 1
+        ###actions are represented as array of size of control inuts
         self.action_space = spaces.Box(low=-1*np.ones(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
+        ## state space
+        ### continuous space given with no upper or lower bounds
+        ### shape is of ny+nd*Np 
+        #### state space will contain a concatenation of ny greenhouse measurement variables 
+        #### and nd*Np weather variables.
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(ny + nd*Np,))
 
         # lower and upper bounds on observations
@@ -93,7 +102,6 @@ class LettuceGreenhouse(gym.Env):
         ## Denormalization -> x = x_norm*(xmax - xmin) + xmin
         ## So the normalization was done into make it easier for agent to explore the action space
         ## Need to convert back so then we can consider the environment 
-
         action_denorm = action*(self.max_action - self.min_action) + self.min_action
 
         # 2. Transition state to next state given action and observe environment
@@ -135,17 +143,43 @@ class LettuceGreenhouse(gym.Env):
         Ex: maximize profit of greenhouse
         - need to maximize the lettuce dry weight -> This is a state...
         - need to minmize energy supply by heating system, ventilation rate, and supply rate of CO2 -> these are actions...
-        - 
+        
+        total revenue - total expenses
         """
 
         #TODO: implement reward function.
         # Main goals of this functions are to:
         # 1. Compute reward of greenhouse (e.g., profit of the greenhouse)
+        ## first compute the total expense
+
+        ### cost of CO2 (CO2 added)
+        ##### cost of CO2 = CO2_Cost * CO2_Capacity * Amount of CO2 Observed Indoors (state[1])
+        cost_CO2 = self.p["co2Cost"] * self.p["CO2cap"] * self.state[1]
+        ### COST OF ENERGY:
+        """
+        Cost of Energy = Cost of Lighting + Cost of Ventilation + Cost of Heating
+        ## Will likely ommit the cost of lighting for now...
+
+        Ventilation
+        - Ventilation Capacity
+        - Ventilation Rate
+        - Then Cost of Energy
+
+        """
+        #### What else to energy because that would be an action right not a state? if energy consumed was a state then that would work
+                #### but there is no energy state just an action
+        total_cost_energy = self.p["energyCost"]*
+        ### ventilation cost
+        #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * Ventilation Rate [mm/s] * Cost of Energy [euro/J]
+        #### convert ventilation rate to m 
+        cost_vent = self.p["ventCap"]*(action[1]/1000)*self.p["energyCost"] # MISSING SOME SORT OF UNIT HERE....!!!
+        ## next compute thte total revenue
 
         # 2. return reward
+        reward =  total_revenue - total_expenses
 
 
-        return 
+        return reward
 
     def reset(self):
         """
@@ -162,9 +196,13 @@ class LettuceGreenhouse(gym.Env):
         #TODO: implement reset function.
         # Main goals of this functions are to:
         # 1. Reset state of environment to initial state
+        self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         # 2. Reset variables of environment to initial values
+        self.timestep = 0
         # 3. Return first observation
-        pass
+        
+        
+        return self.state
 
     def close(self):
         return
