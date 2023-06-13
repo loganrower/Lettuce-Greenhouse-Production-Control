@@ -153,33 +153,65 @@ class LettuceGreenhouse(gym.Env):
         ## first compute the total expense
 
         ### cost of CO2 (CO2 added)
-        ##### cost of CO2 = CO2_Cost * CO2_Capacity * Amount of CO2 Observed Indoors (state[1])
-        cost_CO2 = self.p["co2Cost"] * self.p["CO2cap"] * self.state[1]
+        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2/s]
+            ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
+            ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
+            ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
+        co2_units = 1/(1000*1000*self.h) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
+        cost_CO2 = self.p["co2Cost"] * action[0]*(1/(1000*1000*self.h)) # euro/m^2 Cost CO2
         ### COST OF ENERGY:
         """
-        Cost of Energy = Cost of Lighting + Cost of Ventilation + Cost of Heating
+        Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
         ## Will likely ommit the cost of lighting for now...
 
-        Ventilation
+        Ventilation ( NOT INCLUDING FOR NOW)
         - Ventilation Capacity
         - Ventilation Rate
         - Then Cost of Energy
 
         """
-        #### What else to energy because that would be an action right not a state? if energy consumed was a state then that would work
+        ## Heating Energy Costs
+
+        # ## What else to energy because that would be an action right not a state? if energy consumed was a state then that would work
                 #### but there is no energy state just an action
-        total_cost_energy = self.p["energyCost"]*
+        
         ### ventilation cost
-        #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * Ventilation Rate [mm/s] * Cost of Energy [euro/J]
-        #### convert ventilation rate to m 
-        cost_vent = self.p["ventCap"]*(action[1]/1000)*self.p["energyCost"] # MISSING SOME SORT OF UNIT HERE....!!!
+        
+        #### first need to compute the total ventilation rate to understand the intended and unintended airflow in the system
+        # ### This means including the leakage and ventilation rate together 
+        # ### tot_ventilation = ((Ventilation Rate [mm/s])*(1 m/1000mm)) +  Ventilation Leakage [m/s]
+        tot_vent = (action[1]/1000) + self.p["leak"]
+        #### Now our final cost equation related to energy expenditure for ventilation is as follows:
+        #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * (Total Ventilation Rate (I/O) [m/s])* Cost of Energy [euro/J] *Indoor Air Temp (Current) [°C] * timestep (s)
+        cost_vent = self.p["ventCap"]*tot_vent*self.p["energyCost"]*self.state[2]*self.h #euro/m^2 Cost of Energy Related to Ventilation
+        
+        ### The cost of heating
+        #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [W/m^2] (Convert from W to Joule/s)
+        #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [J/(s*(m^2))] * timestep (seconds)
+        heat_cost =  self.p["energyCost"] * action[2] * self.h ## [e]uro/m^2]
+
+        ### Total cost of energy [euro/m^2]
+        total_cost_energy = heat_cost + cost_vent
+
+        ## total expenses [euro/m^2]
+        total_expenses = total_cost_energy + cost_CO2
+
         ## next compute thte total revenue
+        ### Revenue is determined based on dry weight of crop, yield and price of crop
+        ### Yield -> It quantifies the proportion of lettuce produced relative to the dry weight.
+        ### Dry Weight -> weight of lettuce after removing the moisture content
+        ### combining the yield factor and dry weight gives a better indication of the amount of lettuce to be sold
+        ### Price of Lettuce -> euro/kg
+        ### Equation for Lettuce Profit = Lettuce Dry Weight [kg/m^2] * Yield Factor [-] * Price of Lettuce [euro/kg]
+        ### THE LETTUCE PRICE PARAMETER SEEMS VERY STRANGE.... 
+        ### INSTEAD OF LETTUCE PRICE PARAMETER SHOULD I USE self.p["productPrice1"] which is around .81 but the units are also confusing for this ASK BART!
+        total_revenue = self.state[0]*self.p["alfaBeta"] *self.p["lettucePrice"]  # [euro/m^2]
 
         # 2. return reward
-        reward =  total_revenue - total_expenses
+        net_profit =  total_revenue - total_expenses
 
 
-        return reward
+        return net_profit
 
     def reset(self):
         """
