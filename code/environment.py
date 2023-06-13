@@ -98,7 +98,7 @@ class LettuceGreenhouse(gym.Env):
 
         # 2. Transition state to next state given action and observe environment
         ## Observe the environment or the weather?
-        state_new = f(action_denorm, self.d)
+        next_state = self.f(action_denorm, self.d)
         # 3. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
@@ -114,10 +114,11 @@ class LettuceGreenhouse(gym.Env):
         ### Ex: focus on minimizing heating and environmental cost...
         ### Ex: focus on the production of lettuce...
         ### The function will then steer what the algorithm will focus on...
-        reward = self.reward_function(obs, action_denorm)
+        reward = self.reward_function(next_state, action_denorm)
         # 5. return observation, reward, done, info
         # return obs, reward, done, {}
         ### dont need to worry about info it can just be an empty dictionary
+        obs = next_state
         return obs, reward, done, {}
 
     def reward_function(self, obs, action):
@@ -126,21 +127,24 @@ class LettuceGreenhouse(gym.Env):
         Is called after simulating the environment for one timestep.
         Uses observation and action to compute reward, e.g., profit of greenhouse.
         Args:
-            - obs: observation of environment
+            - obs: observation of environment (should be 4 values)
             - action: action of agent
         
         Returns: reward
 
-        Ex: profit of greenhouse
-
-        Ex: production of the lettuce..
-
-
+        Ex: maximize profit of greenhouse
+        - need to maximize the lettuce dry weight -> This is a state...
+        - need to minmize energy supply by heating system, ventilation rate, and supply rate of CO2 -> these are actions...
+        - 
         """
+
         #TODO: implement reward function.
         # Main goals of this functions are to:
         # 1. Compute reward of greenhouse (e.g., profit of the greenhouse)
+
         # 2. return reward
+
+
         return 
 
     def reset(self):
