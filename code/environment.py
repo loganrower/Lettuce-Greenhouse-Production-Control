@@ -223,7 +223,7 @@ class LettuceGreenhouse(gym.Env):
 
         and reset variables to their initial state...
 
-        
+
         """
         #TODO: implement reset function.
         # Main goals of this functions are to:
@@ -240,6 +240,11 @@ class LettuceGreenhouse(gym.Env):
         return
     ## Adding in the Policy Function HERE...
     def policy_function(self):
+        """
+        This policy needs to go based on the current state variables
+
+        Then a change will be made to an action
+        """
         ## compute the 
         return
 
