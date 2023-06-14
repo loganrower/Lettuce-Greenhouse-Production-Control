@@ -62,6 +62,9 @@ class LettuceGreenhouse(gym.Env):
         ### shape is of ny+nd*Np 
         #### state space will contain a concatenation of ny greenhouse measurement variables 
         #### and nd*Np weather variables.
+        #### Initial Four Measurements... (Current of State Variables)
+        #### Then we have Future Predictions for the Four State Variables... (Future Prediction of State Variables)
+        #### The observation space is then split up 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(ny + nd*Np,))
 
         # lower and upper bounds on observations
@@ -75,9 +78,14 @@ class LettuceGreenhouse(gym.Env):
         self.p = DefineParameters()
 
         # initial state of the environment
-        self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
-        self.timestep = 0
+        ## -	Lettuce dry weight [kg/m2]
+        ## -	Indoor CO¬2 concentration [kg/m3]
+        ## -	Indoor air temperature [C]
+        ## -	Indoor humidity [kg/m¬3]
 
+        self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
+        self.state_init = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
+        self.timestep = 0
         # number of variables
         self.Np = Np
         self.ny = ny
@@ -111,16 +119,17 @@ class LettuceGreenhouse(gym.Env):
         action_denorm = action*(self.max_action - self.min_action) + self.min_action
 
         # 2. Transition state to next state given action and observe environment
-        next_state = self.f(action_denorm, self.d[self.time_step])
+        ## obs = next_state
+        obs = self.f(action_denorm, self.d[self.time_step])
         # 3. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
         ## 
         if self.N == self.timestep:
-            done =  "done"
+            done = "done"
         else:
             done = "not done"
-            # Then need to increae the timestep:
+            # Then need to increase the timestep:
             self.time_step += 1
 
         # 4. Compute reward from profit of greenhouse
@@ -129,11 +138,10 @@ class LettuceGreenhouse(gym.Env):
         ### Ex: focus on minimizing heating and environmental cost...
         ### Ex: focus on the production of lettuce...
         ### The function will then steer what the algorithm will focus on...
-        reward = self.reward_function(next_state, action_denorm)
+        reward = self.reward_function(obs, action_denorm)
         # 5. return observation, reward, done, info
-        # return obs, reward, done, {}
+        # return obs , reward, done, {}
         ### dont need to worry about info it can just be an empty dictionary
-        obs = next_state
         return obs, reward, done, {}
 
     def reward_function(self, obs, action):
@@ -152,6 +160,8 @@ class LettuceGreenhouse(gym.Env):
         - need to minmize energy supply by heating system, ventilation rate, and supply rate of CO2 -> these are actions...
         
         total revenue - total expenses
+
+        ONLY TESTING WITH TOTAL REVENUE FOR ASSIGNMENT STEP 3
         """
 
         #TODO: implement reward function.
@@ -190,7 +200,7 @@ class LettuceGreenhouse(gym.Env):
         tot_vent = (action[1]/1000) + self.p["leak"]
         #### Now our final cost equation related to energy expenditure for ventilation is as follows:
         #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * (Total Ventilation Rate (I/O) [m/s])* Cost of Energy [euro/J] *Indoor Air Temp (Current) [°C] * timestep (s)
-        cost_vent = self.p["ventCap"]*tot_vent*self.p["energyCost"]*self.state[2]*self.h #euro/m^2 Cost of Energy Related to Ventilation
+        cost_vent = self.p["ventCap"]*tot_vent*self.p["energyCost"]*obs[2]*self.h #euro/m^2 Cost of Energy Related to Ventilation
         
         ### The cost of heating
         #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [W/m^2] (Convert from W to Joule/s)
@@ -212,13 +222,18 @@ class LettuceGreenhouse(gym.Env):
         ### Equation for Lettuce Profit = Lettuce Dry Weight [kg/m^2] * Yield Factor [-] * Price of Lettuce [euro/kg]
         ### THE LETTUCE PRICE PARAMETER SEEMS VERY STRANGE.... 
         ### INSTEAD OF LETTUCE PRICE PARAMETER SHOULD I USE self.p["productPrice1"] which is around .81 but the units are also confusing for this ASK BART!
-        total_revenue = self.state[0]*self.p["alfaBeta"] *self.p["lettucePrice"]  # [euro/m^2]
+        ##### ORIGINAL EQUATION....
+        #####total_revenue = obs[0]*self.p["alfaBeta"] *self.p["lettucePrice"]  # [euro/m^2]
+        ##### Equation... https://www.sciencedirect.com/science/article/pii/S0967066108001019#bib22
+        ##### auc_price = productPrice1 [euro/m^2] + (Lettuce Dry Weight [kg/m^2] * Dry Weight to Wet Weight Ratio * productPrice2 [euro/(kg)])
+        #### auc_price = [euro/m^2] + [euro/m^2]
+        total_revenue = (obs[0]*self.p["dw_fw"])*self.p["productPrice2"] + self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
 
         # 2. return reward
         net_profit =  total_revenue - total_expenses
 
 
-        return net_profit
+        return total_revenue
 
     def reset(self):
         """
@@ -235,7 +250,7 @@ class LettuceGreenhouse(gym.Env):
         #TODO: implement reset function.
         # Main goals of this functions are to:
         # 1. Reset state of environment to initial state
-        self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
+        self.state = self.state_init
         # 2. Reset variables of environment to initial values
         self.timestep = 0
         # 3. Return first observation
