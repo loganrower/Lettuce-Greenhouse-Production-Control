@@ -39,18 +39,24 @@ class LettuceGreenhouse(gym.Env):
         super(LettuceGreenhouse, self).__init__()
 
         # simulation parameters
-        self.h = h
+        self.h = h # sampling period, the data is taken every 15 minutes
         self.c = c
         self.nDays = nDays
-        self.L = nDays*c # seconds...
-        self.N = self.L//self.h ## 192... steps?
+        self.L = nDays*c # two simulation days in seconds
+        self.N = self.L//self.h ## 192 steps
 
         # action and observation spaces
         ## action space
         ###continuous range of actions
         ### upper and lower values are specified as -1 and 1
-        ###actions are represented as array of size of control inuts
+        ### actions are represented as array of size of control inputs
+        ### Normalized Action Space
+        ##  # -	Supply rate of carbon dioxide [mg/m2/s]
+        ##  # -	Ventilation rate [mm/s]
+        ##  # -	Energy supply by heating the system [W/m2]
+
         self.action_space = spaces.Box(low=-1*np.ones(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
+
         ## state space
         ### continuous space given with no upper or lower bounds
         ### shape is of ny+nd*Np 
@@ -105,8 +111,7 @@ class LettuceGreenhouse(gym.Env):
         action_denorm = action*(self.max_action - self.min_action) + self.min_action
 
         # 2. Transition state to next state given action and observe environment
-        ## Observe the environment or the weather?
-        next_state = self.f(action_denorm, self.d)
+        next_state = self.f(action_denorm, self.d[self.time_step])
         # 3. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
@@ -115,6 +120,8 @@ class LettuceGreenhouse(gym.Env):
             done =  "done"
         else:
             done = "not done"
+            # Then need to increae the timestep:
+            self.time_step += 1
 
         # 4. Compute reward from profit of greenhouse
         ## how good action was....
