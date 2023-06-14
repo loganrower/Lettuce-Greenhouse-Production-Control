@@ -181,11 +181,6 @@ class LettuceGreenhouse(gym.Env):
         Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
         ## Will likely ommit the cost of lighting for now...
 
-        Ventilation ( NOT INCLUDING FOR NOW)
-        - Ventilation Capacity
-        - Ventilation Rate
-        - Then Cost of Energy
-
         """
         ## Heating Energy Costs
 
@@ -254,8 +249,6 @@ class LettuceGreenhouse(gym.Env):
         # 2. Reset variables of environment to initial values
         self.timestep = 0
         # 3. Return first observation
-        
-        
         return self.state
 
     def close(self):
