@@ -238,6 +238,10 @@ class LettuceGreenhouse(gym.Env):
 
     def close(self):
         return
+    ## Adding in the Policy Function HERE...
+    def policy_function(self):
+        ## compute the 
+        return
 
     def f(self, action, d):
         """
