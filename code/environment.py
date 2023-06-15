@@ -22,7 +22,7 @@ class LettuceGreenhouse(gym.Env):
         nu=3,                 # number of control inputs
         h=15*60,              # sampling period (15 minutes, 900 seconds...)
         c=86400,              # conversion to seconds
-        nDays=2,              # simulation days
+        nDays= 2,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
         startDay=40,          # start day of simulation
         ):
@@ -76,6 +76,8 @@ class LettuceGreenhouse(gym.Env):
         self.max_action = np.array([1.2, 7.5, 150.], dtype=np.float32)
 
         self.p = DefineParameters()
+
+
         # initial state of the environment
         ## -	Lettuce dry weight [kg/m2]
         ## -	Indoor CO¬2 concentration [kg/m3]
@@ -85,6 +87,11 @@ class LettuceGreenhouse(gym.Env):
         self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         self.state_init = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         self.timestep = 0
+
+        ## State Old
+        self.old_state = np.zeros(4)
+
+
         # number of variables
         self.Np = Np
         self.ny = ny
@@ -119,7 +126,9 @@ class LettuceGreenhouse(gym.Env):
 
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
+        print("Old State:",self.old_state)
         obs = self.f(action_denorm, self.d[self.timestep])
+        print("Current State:", obs[0])
         # 3. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
@@ -137,10 +146,16 @@ class LettuceGreenhouse(gym.Env):
         ### Ex: focus on minimizing heating and environmental cost...
         ### Ex: focus on the production of lettuce...
         ### The function will then steer what the algorithm will focus on...
+
+        
         reward = self.reward_function(obs, action_denorm)
+
         # 5. return observation, reward, done, info
         # return obs , reward, done, {}
         ### dont need to worry about info it can just be an empty dictionary
+
+        self.old_state = obs
+        print("-------------------------------------------------",)
         return obs, reward, done, {}
 
     def reward_function(self, obs, action):
@@ -221,24 +236,30 @@ class LettuceGreenhouse(gym.Env):
         ##### Equation... https://www.sciencedirect.com/science/article/pii/S0967066108001019#bib22
         ##### auc_price = productPrice1 [euro/m^2] + (Lettuce Dry Weight [kg/m^2] * Dry Weight to Wet Weight Ratio * productPrice2 [euro/(kg)])
         #### auc_price = [euro/m^2] + [euro/m^2]
-        total_revenue = (obs[0]*self.p["dw_fw"])*self.p["productPrice2"] + self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
+        if self.timestep == 0:
+            total_revenue = (abs(self.old_state[0] - obs[0])*self.p["productPrice2"] )+ self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
+        else:
+            # dont add the extra..
+            total_revenue = (abs(self.old_state[0] - obs[0]))*self.p["productPrice2"]  # Auction Price of Lettuce euro/m^2
 
-        # 2. return reward
+        # 2. return reward|
         net_profit =  total_revenue - total_expenses
-
-
+        # print("timestep:",self.timestep)
+        # print("Current State:", obs[0])
+        # print("Old State:",old_state[0])
+        # print("Total Rev", total_revenue)
+        # print("action:",action)
+        # print("Total Expenses",total_expenses,"\n")
         return net_profit
+    
 
     def reset(self):
         """
         Resets environment to starting state.
         Returns:
             observation -- environment state
-
         called every time before you run your environment
-
         and reset variables to their initial state...
-
 
         """
         #TODO: implement reset function.
@@ -302,7 +323,7 @@ class LettuceGreenhouse(gym.Env):
 
 
     ## Adding in the Policy Function HERE...
-    def policy_function(self, state, action):
+    def policy_function(self, obs, action):
         """
         DETERMINISTIC...
 
@@ -338,33 +359,27 @@ class LettuceGreenhouse(gym.Env):
         ## First decrease the ventilation (cheaper than increasing the heating)
         ## Then increase heating
 
+        #### PUT BOUNDS SO DONT GO OUTSIDE ACTION SPACE....
         low_th = 18.33 # C
         high_th = 21.11 # C
-        if state[2] < low_th:
+        if obs[2] < low_th:
             ## This means it is outside the lower bound and we need to increase temperature...
             ### decrease the ventilation,
-            action[1]-= .1
+            #action[1]-= .3
             ### increase the energy for heating
-            action[2]+= .1
-        elif state[2] > high_th:
+            action[2]+= .3
+        elif obs[2] > high_th:
             ## This means it is outside the upper bound and we need to decrease temperature...
             ### increase the ventilation,
-            action[1]+= .1
+            #action[1]+= .3
             ### decrease the energy for heating
-            action[2]-= .1
+            action[2]-= .3
 
         # this is a normalized action and is what will be inputted into the step function...
+        
         return action
 
         
-
-
-    
-
-
-
-
-        return
 
     def f(self, action, d):
         """

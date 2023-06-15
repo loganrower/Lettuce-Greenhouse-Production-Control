@@ -44,7 +44,7 @@ def DefineParameters():
     p["energyCost"] = 6.35e-9/2.20371   # price of energy                               [€ J^{-1}]              6.35e-9 [Dfl J^{-1}] (division by 2.20371 represents currency conversion)
     p["co2Cost"] = 42e-2/2.20371        # price of CO2                                  [€ kg^{-1}{CO2}]        42e-2 [Dfl kg^{-1}{CO2}] (division by 2.20371 represents currency conversion)
     p["productPrice1"] = 1.8/2.20371    # parameter for price of product                [€ m^{-2}{gh}]          1.8 [Dfl kg^{-1}{gh}] (division by 2.20371 represents currency conversion)
-    p["productPrice2"] = 16/2.20371     # parameter for price of product (SHOULD NOT BE m^-2)               [€ kg^{-1}{gh} m^{-2}{gh}] 16 (division by 2.20371 represents currency conversion)
+    p["productPrice2"] = 16/2.20371     # parameter for price of product (SHOULD NOT BE m^-2)               [€ kg^{-1}{gh} {gh}] 16 (division by 2.20371 represents currency conversion)
 
     p["lue"] = 7.5e-8
     p["heatLoss"] = 1
