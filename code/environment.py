@@ -244,12 +244,11 @@ class LettuceGreenhouse(gym.Env):
 
         # 2. return reward|
         net_profit =  total_revenue - total_expenses
-        # print("timestep:",self.timestep)
-        # print("Current State:", obs[0])
-        # print("Old State:",old_state[0])
-        # print("Total Rev", total_revenue)
-        # print("action:",action)
-        # print("Total Expenses",total_expenses,"\n")
+        print("timestep:",self.timestep)
+        print("Total Rev", total_revenue)
+        print("action:",action)
+        print("Total Expenses",total_expenses,"\n")
+
         return net_profit
     
 
@@ -362,16 +361,19 @@ class LettuceGreenhouse(gym.Env):
         #### PUT BOUNDS SO DONT GO OUTSIDE ACTION SPACE....
         low_th = 18.33 # C
         high_th = 21.11 # C
+
+        #### PLACED BOUNDS SO THAT THE ACTIONS WERE NOT INCREASED
+
         if obs[2] < low_th:
             ## This means it is outside the lower bound and we need to increase temperature...
             ### decrease the ventilation,
-            #action[1]-= .3
+            action[1]-= .3
             ### increase the energy for heating
             action[2]+= .3
         elif obs[2] > high_th:
             ## This means it is outside the upper bound and we need to decrease temperature...
             ### increase the ventilation,
-            #action[1]+= .3
+            action[1]+= .3
             ### decrease the energy for heating
             action[2]-= .3
 
