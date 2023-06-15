@@ -10,8 +10,7 @@ from scipy import signal
 
 def DefineParameters():
     # Model parameters
-    p={}
-
+    p = { }
     # parameter 					    description 									[unit] 					nominal value
     p["satH2O1"] = 9348                 # saturation water vapour parameter 			[J m^{-3}] 				9348
     p["satH2O2"] = 17.4                 # saturation water vapour parameter 			[-] 					17.4
@@ -45,7 +44,7 @@ def DefineParameters():
     p["energyCost"] = 6.35e-9/2.20371   # price of energy                               [€ J^{-1}]              6.35e-9 [Dfl J^{-1}] (division by 2.20371 represents currency conversion)
     p["co2Cost"] = 42e-2/2.20371        # price of CO2                                  [€ kg^{-1}{CO2}]        42e-2 [Dfl kg^{-1}{CO2}] (division by 2.20371 represents currency conversion)
     p["productPrice1"] = 1.8/2.20371    # parameter for price of product                [€ m^{-2}{gh}]          1.8 [Dfl kg^{-1}{gh}] (division by 2.20371 represents currency conversion)
-    p["productPrice2"] = 16/2.20371     # parameter for price of product (SHOULD NOT BE m^-2)               [€ kg^{-1}{gh} m^{-2}{gh}] 16 (division by 2.20371 represents currency conversion)
+    p["productPrice2"] = 16/2.20371     # parameter for price of product (SHOULD NOT BE m^-2)               [€ kg^{-1}{gh} {gh}] 16 (division by 2.20371 represents currency conversion)
 
     p["lue"] = 7.5e-8
     p["heatLoss"] = 1
@@ -54,6 +53,7 @@ def DefineParameters():
     p["lettucePrice"] = 136.4
     p["heatMin"] = 0
     p["heatMax"] = 100
+    return p
 
 
 def rh2vaporDens(temp,rh):
