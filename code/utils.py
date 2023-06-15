@@ -10,8 +10,7 @@ from scipy import signal
 
 def DefineParameters():
     # Model parameters
-    p={}
-
+    p = { }
     # parameter 					    description 									[unit] 					nominal value
     p["satH2O1"] = 9348                 # saturation water vapour parameter 			[J m^{-3}] 				9348
     p["satH2O2"] = 17.4                 # saturation water vapour parameter 			[-] 					17.4
@@ -54,6 +53,7 @@ def DefineParameters():
     p["lettucePrice"] = 136.4
     p["heatMin"] = 0
     p["heatMax"] = 100
+    return p
 
 
 def rh2vaporDens(temp,rh):

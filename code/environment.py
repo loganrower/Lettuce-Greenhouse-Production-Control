@@ -9,8 +9,8 @@ That regulates amount of heating (W/m2) and carbon dioxide into the greenhouse.
 import numpy as np
 from utils import co2dens2ppm, vaporDens2rh, load_disturbances, DefineParameters
 
-import gym
-from gym import spaces
+import gymnasium as gym
+from gymnasium import spaces
 
 class LettuceGreenhouse(gym.Env):
 
@@ -76,7 +76,6 @@ class LettuceGreenhouse(gym.Env):
         self.max_action = np.array([1.2, 7.5, 150.], dtype=np.float32)
 
         self.p = DefineParameters()
-
         # initial state of the environment
         ## -	Lettuce dry weight [kg/m2]
         ## -	Indoor CO¬2 concentration [kg/m3]
@@ -120,17 +119,17 @@ class LettuceGreenhouse(gym.Env):
 
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
-        obs = self.f(action_denorm, self.d[self.time_step])
+        obs = self.f(action_denorm, self.d[self.timestep])
         # 3. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
         ## 
         if self.N == self.timestep:
-            done = "done"
+            done = True
         else:
-            done = "not done"
+            done = False
             # Then need to increase the timestep:
-            self.time_step += 1
+            self.timestep += 1
 
         # 4. Compute reward from profit of greenhouse
         ## how good action was....
@@ -171,11 +170,11 @@ class LettuceGreenhouse(gym.Env):
 
         ### cost of CO2 (CO2 added)
         ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2/s]
-            ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
-            ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
-            ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
+        #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
+        #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
+        #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
         co2_units = 1/(1000*1000*self.h) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
-        cost_CO2 = self.p["co2Cost"] * action[0]*(1/(1000*1000*self.h)) # euro/m^2 Cost CO2
+        cost_CO2 = self.p["co2Cost"] * action[0]*(co2_units) # euro/m^2 Cost CO2
         ### COST OF ENERGY:
         """
         Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
@@ -228,7 +227,7 @@ class LettuceGreenhouse(gym.Env):
         net_profit =  total_revenue - total_expenses
 
 
-        return total_revenue
+        return net_profit
 
     def reset(self):
         """
@@ -250,17 +249,121 @@ class LettuceGreenhouse(gym.Env):
         self.timestep = 0
         # 3. Return first observation
         return self.state
+    
+    # Function to check terminal state:
+    def terminal_state(self):
+        if self.N == self.timestep:
+            done = True
+        else:
+            done = False
+        return done
 
     def close(self):
         return
-    ## Adding in the Policy Function HERE...
-    def policy_function(self):
+    ## Function to detemrine the affect of tuning the values:
+    ## DONT USE THIS!!!
+    def action_tune(self,obs):
         """
+        Test the action to see the reward that we get for that action by trying to change it to a value in 
+        the range...
+        self.min_action = np.array([0., 0., 0.], dtype=np.float32)
+        self.max_action = np.array([1.2, 7.5, 150.], dtype=np.float32)
+
+        This would need to run after the step function, since we need to get the "next state" instead of current state...
+        If we want to get the reward
+        """
+        #
+        reward = 0
+        best_reward = 0 
+        act = np.zeros(3)
+        best_act = np.zeros(3)
+        for act_1 in np.arange(self.min_action[0], self.max_action[0], .1): # 12 values
+            #  Starting with action 1
+            act[0] = act_1
+            for act_2 in np.arange(self.min_action[1], self.max_action[1], .625): # 12 values
+                # Now action 2
+                act[1] = act_2
+                for act_3 in np.arange(self.min_action[2], self.max_action[2], 12.5): # 12 values
+                    # finally get the third action value to test
+                    act[2] = act_3
+                
+                    # now test reward function for these...
+                    # Using the current state and the 
+                    #print(act)
+                    reward = self.reward_function(obs, act)
+                    if reward > best_reward:
+                        best_reward = reward
+                        best_act =  act
+
+        # Normalize Best Action..
+        act_norm = (best_act - self.min_action) / (self.max_action - self.min_action)
+        # return the best actions normalize
+        return act_norm
+
+
+    ## Adding in the Policy Function HERE...
+    def policy_function(self, state, action):
+        """
+        DETERMINISTIC...
+
         This policy needs to go based on the current state variables
 
         Then a change will be made to an action
+
+        Args:
+            - state -> the state (new) 
+            - action -> action (normalized)
+
+        Return:
+            - Best action
+
+        Action: (Only idx 1,2)
+            -	Ventilation rate [mm/s]
+            -	Energy supply by heating the system [W/m2]
+        
+        So essentially our policy will change the temperature if it is outside the threshold
+
+        Target Temperature Range 65F to 70 F -> Convert or find celcius range 
+
+        # So if the current temperture is larger than this then it will decrease the temperature 
+
         """
-        ## compute the 
+        ## Our Policy is Based on Temperature....
+
+        # If temperature is higher than the threshold range
+        ## First we reduce heating (this in turn reduces a lot of excess energy usage)
+        ## Then we increase the ventilation
+
+         # If temperature is lower than the threshold range
+        ## First decrease the ventilation (cheaper than increasing the heating)
+        ## Then increase heating
+
+        low_th = 18.33 # C
+        high_th = 21.11 # C
+        if state[2] < low_th:
+            ## This means it is outside the lower bound and we need to increase temperature...
+            ### decrease the ventilation,
+            action[1]-= .1
+            ### increase the energy for heating
+            action[2]+= .1
+        elif state[2] > high_th:
+            ## This means it is outside the upper bound and we need to decrease temperature...
+            ### increase the ventilation,
+            action[1]+= .1
+            ### decrease the energy for heating
+            action[2]-= .1
+
+        # this is a normalized action and is what will be inputted into the step function...
+        return action
+
+        
+
+
+    
+
+
+
+
         return
 
     def f(self, action, d):
@@ -334,3 +437,4 @@ class LettuceGreenhouse(gym.Env):
             np.exp(p["satH2O2"] * x[2] / (x[2] + p["satH2O3"])) - x[3]) - (u[1]/1e3 + p["leak"]) * (x[3] - d[3]))]
             )
         return ki
+
