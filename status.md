@@ -26,3 +26,6 @@
         - Currently having issues with the temperature displayed but it might just be due to the fact it is a normalized value, but need to check this
 
         - Make nice plots using the function g(), and also based on the actual action and state parameters as well. It might be better to use g() for the state parameters though so we can check this.
+
+        - Needed to change the start date from 40 to 90 in order to start end of march, and went over 40 days in order to capture more data...
+            - Since we are only using natural lighting so we want to plant in spring and that is more realistic..

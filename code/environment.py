@@ -9,8 +9,8 @@ That regulates amount of heating (W/m2) and carbon dioxide into the greenhouse.
 import numpy as np
 from utils import co2dens2ppm, vaporDens2rh, load_disturbances, DefineParameters
 
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
 
 class LettuceGreenhouse(gym.Env):
 
@@ -22,9 +22,9 @@ class LettuceGreenhouse(gym.Env):
         nu=3,                 # number of control inputs
         h=15*60,              # sampling period (15 minutes, 900 seconds...)
         c=86400,              # conversion to seconds
-        nDays= 2,              # simulation days
+        nDays= 20,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
-        startDay=40,          # start day of simulation
+        startDay=150,          # start day of simulation (start in march day 90, initial started at 40)
         ):
         """
         Greenhouse environment class, implemented as an OpenAI gym environment.
@@ -55,7 +55,7 @@ class LettuceGreenhouse(gym.Env):
         ##  # -	Ventilation rate [mm/s]
         ##  # -	Energy supply by heating the system [W/m2]
 
-        self.action_space = spaces.Box(low=-1*np.ones(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
+        self.action_space = spaces.Box(low=np.zeros(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
 
         ## state space
         ### continuous space given with no upper or lower bounds
@@ -65,7 +65,7 @@ class LettuceGreenhouse(gym.Env):
         #### Initial Four Measurements... (Current of State Variables)
         #### Then we have Future Predictions for the Four State Variables... (Future Prediction of State Variables)
         #### The observation space is then split up 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(ny + nd*Np,))
+        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(ny + nd*Np,))
 
         # lower and upper bounds on observations
         self.obs_low = np.array([0., 0., 10., 0.], dtype=np.float32)
@@ -89,7 +89,7 @@ class LettuceGreenhouse(gym.Env):
         self.timestep = 0
 
         ## State Old
-        self.old_state = np.zeros(4)
+        self.old_state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
 
 
         # number of variables
@@ -155,8 +155,11 @@ class LettuceGreenhouse(gym.Env):
         ### dont need to worry about info it can just be an empty dictionary
 
         self.old_state = obs
+        observation  = np.zeros((84,))
+        observation[:4] = [obs[0],obs[1],obs[2],obs[3]]
+        observation = np.array(observation , dtype=np.float32)
         print("-------------------------------------------------",)
-        return obs, reward, done, {}
+        return observation, reward, done, {}
 
     def reward_function(self, obs, action):
         """
@@ -184,11 +187,11 @@ class LettuceGreenhouse(gym.Env):
         ## first compute the total expense
 
         ### cost of CO2 (CO2 added)
-        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2/s]
+        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2*s]
         #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
         #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
         #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
-        co2_units = 1/(1000*1000*self.h) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
+        co2_units = self.h/(1000*1000) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
         cost_CO2 = self.p["co2Cost"] * action[0]*(co2_units) # euro/m^2 Cost CO2
         ### COST OF ENERGY:
         """
@@ -240,15 +243,15 @@ class LettuceGreenhouse(gym.Env):
             total_revenue = (abs(self.old_state[0] - obs[0])*self.p["productPrice2"] )+ self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
         else:
             # dont add the extra..
-            total_revenue = (abs(self.old_state[0] - obs[0]))*self.p["productPrice2"]  # Auction Price of Lettuce euro/m^2
+            total_revenue = (abs(self.old_state[0] - obs[0]))*self.p["productPrice2"]   # Auction Price of Lettuce euro/m^2
 
         # 2. return reward|
-        net_profit =  total_revenue - total_expenses
+        net_profit = float((total_revenue) - (total_expenses))
         print("timestep:",self.timestep)
-        print("Total Rev", total_revenue)
         print("action:",action)
-        print("Total Expenses",total_expenses,"\n")
-
+        print("Total Rev", total_revenue)
+        print("Total Expenses",total_expenses)
+        print("Net Profit:", net_profit)
         return net_profit
     
 
@@ -264,11 +267,15 @@ class LettuceGreenhouse(gym.Env):
         #TODO: implement reset function.
         # Main goals of this functions are to:
         # 1. Reset state of environment to initial state
-        self.state = self.state_init
+        ## Need to make sure that it is same shape as the observation environment...
+        self.state = self.state_init # self.state needs to be changed for the f()
+        observation  = np.zeros((84,))
+        observation[:4] = [self.state_init[0],self.state_init[1],self.state_init[2],self.state_init[3]]
+        observation = np.array(observation , dtype=np.float32)
         # 2. Reset variables of environment to initial values
         self.timestep = 0
         # 3. Return first observation
-        return self.state
+        return observation
     
     # Function to check terminal state:
     def terminal_state(self):
