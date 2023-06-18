@@ -8,9 +8,9 @@ That regulates amount of heating (W/m2) and carbon dioxide into the greenhouse.
 """ 
 import numpy as np
 from utils import co2dens2ppm, vaporDens2rh, load_disturbances, DefineParameters
-
 import gymnasium as gym
 from gymnasium import spaces
+import matplotlib.pyplot as plt
 
 class LettuceGreenhouse(gym.Env):
 
@@ -22,9 +22,9 @@ class LettuceGreenhouse(gym.Env):
         nu=3,                 # number of control inputs
         h=15*60,              # sampling period (15 minutes, 900 seconds...)
         c=86400,              # conversion to seconds
-        nDays= 2,              # simulation days
+        nDays= 300,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
-        startDay=40,          # start day of simulation
+        startDay=1,          # start day of simulation
         ):
         """
         Greenhouse environment class, implemented as an OpenAI gym environment.
@@ -91,6 +91,18 @@ class LettuceGreenhouse(gym.Env):
         ## State Old
         self.old_state = np.zeros(4)
 
+        #plot variables
+        self.dry_weight_plot =[]
+        self.indoor_co2_plot = []
+        self.temp_plot = []
+        self.rh_plot = []
+        self.supply_co2_plot = []
+        self.vent_plot = []
+        self.supply_energy_plot = []
+        self.timestep_plot = []
+
+        #Weight variable
+        self.weight_change = 0
 
         # number of variables
         self.Np = Np
@@ -102,6 +114,7 @@ class LettuceGreenhouse(gym.Env):
         self.d = load_disturbances(c, self.L, h , nd, Np, startDay, weather_data_dir)
 
     def step(self, action):
+
         """
         Step function that simulates one timestep into the future given input action.
 
@@ -123,39 +136,48 @@ class LettuceGreenhouse(gym.Env):
         ## So the normalization was done into make it easier for agent to explore the action space
         ## Need to convert back so then we can consider the environment 
         action_denorm = action*(self.max_action - self.min_action) + self.min_action
-
+        self.supply_co2_plot.append(action_denorm[0])
+        self.vent_plot.append(action_denorm[1])
+        self.supply_energy_plot.append(action_denorm[2])
+        print("Old Action[0]:", action_denorm)
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
-        print("Old State:",self.old_state)
+        print("Old temperature:",self.old_state[2])
         obs = self.f(action_denorm, self.d[self.timestep])
-        print("Current State:", obs[0])
-        # 3. Check whether state is terminal
-        ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
-        ## so we will just add one to the timestep since there are 192 periods that we are sampling from
-        ## 
-        if self.N == self.timestep:
-            done = True
-        else:
-            done = False
-            # Then need to increase the timestep:
-            self.timestep += 1
+        measurement = self.g()
+        self.dry_weight_plot.append(measurement[0])
+        self.indoor_co2_plot.append(measurement[1])
+        self.temp_plot.append(measurement[2])
+        self.rh_plot.append(measurement[3])
+        self.timestep_plot.append(self.timestep)
+        print("Current temperature:", obs[2])
 
-        # 4. Compute reward from profit of greenhouse
+
+
+        # 3. Compute reward from profit of greenhouse
         ## how good action was....
         ## can determine where we want to focus...
         ### Ex: focus on minimizing heating and environmental cost...
         ### Ex: focus on the production of lettuce...
         ### The function will then steer what the algorithm will focus on...
 
-        
+        #print("obs zero before reward:", obs[0])
+        #print("old state zero before reward", self.old_state[0])
         reward = self.reward_function(obs, action_denorm)
 
-        # 5. return observation, reward, done, info
+        # 4. return observation, reward, done, info
         # return obs , reward, done, {}
         ### dont need to worry about info it can just be an empty dictionary
 
-        self.old_state = obs
-        print("-------------------------------------------------",)
+        self.old_state = obs.copy()
+
+        # 5. Check whether state is terminal
+        ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
+        ## so we will just add one to the timestep since there are 192 periods that we are sampling from
+        ##
+
+        done = self.terminal_state()
+        print("-------------------------------------------------", "\n")
         return obs, reward, done, {}
 
     def reward_function(self, obs, action):
@@ -188,8 +210,8 @@ class LettuceGreenhouse(gym.Env):
         #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
         #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
         #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
-        co2_units = 1/(1000*1000*self.h) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
-        cost_CO2 = self.p["co2Cost"] * action[0]*(co2_units) # euro/m^2 Cost CO2
+        co2_units = 1/(1000*1000) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
+        cost_CO2 = self.p["co2Cost"] * action[0]*(co2_units)*self.h # euro/m^2 Cost CO2
         ### COST OF ENERGY:
         """
         Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
@@ -243,11 +265,12 @@ class LettuceGreenhouse(gym.Env):
             total_revenue = (abs(self.old_state[0] - obs[0]))*self.p["productPrice2"]  # Auction Price of Lettuce euro/m^2
 
         # 2. return reward|
-        net_profit =  total_revenue - total_expenses
+        net_profit =  total_revenue #- total_expenses
         print("timestep:",self.timestep)
         print("Total Rev", total_revenue)
-        print("action:",action)
-        print("Total Expenses",total_expenses,"\n")
+        print("Total Expenses",total_expenses)
+        print("Weight change: " + str((obs[0]-self.old_state[0])*1000))
+        self.weight_change += (obs[0]-self.old_state[0])*1000
 
         return net_profit
     
@@ -273,9 +296,11 @@ class LettuceGreenhouse(gym.Env):
     # Function to check terminal state:
     def terminal_state(self):
         if self.N == self.timestep:
+            self.printer()
             done = True
         else:
             done = False
+            self.timestep += 1
         return done
 
     def close(self):
@@ -359,23 +384,35 @@ class LettuceGreenhouse(gym.Env):
         ## Then increase heating
 
         #### PUT BOUNDS SO DONT GO OUTSIDE ACTION SPACE....
-        low_th = 18.33 # C
-        high_th = 21.11 # C
+        low_th = 13.50 # C
+        high_th = 16.50 # C
 
         #### PLACED BOUNDS SO THAT THE ACTIONS WERE NOT INCREASED
 
         if obs[2] < low_th:
             ## This means it is outside the lower bound and we need to increase temperature...
             ### decrease the ventilation,
-            action[1]-= .3
-            ### increase the energy for heating
-            action[2]+= .3
-        elif obs[2] > high_th:
+            if action[1] >= 0.25:
+                action[1] -= 0.25
+            else:
+                action[1] = 0.0
+                ### increase the energy for heating
+            if action[2] <= 0.75:
+                action[2] += 0.25
+            else:
+                action[2] = 1.0
+        elif obs[2] >= high_th:
             ## This means it is outside the upper bound and we need to decrease temperature...
             ### increase the ventilation,
-            action[1]+= .3
+            if action[1] <= 0.75:
+                action[1] += 0.25
+            else:
+                action[1] = 1.0
             ### decrease the energy for heating
-            action[2]-= .3
+            if action[2] >= 0.25:
+                action[2] -= 0.25
+            else:
+                action[2] = 0.0
 
         # this is a normalized action and is what will be inputted into the step function...
         
@@ -455,3 +492,46 @@ class LettuceGreenhouse(gym.Env):
             )
         return ki
 
+    def printer(self):
+        print("Final weight change: " + str(self.weight_change))
+        plt.figure(figsize=(15,15))
+
+        ax_1 = plt.subplot(4,2,1)
+        plt.plot(self.timestep_plot, self.supply_co2_plot)
+        #ax_1.set_title('')
+        ax_1.set_xlabel('Time in 15 min steps')
+        ax_1.set_ylabel('Supply rate of carbon dioxide [mg]/[m^2][s]')
+
+        ax_2 = plt.subplot(4,2,2)
+        plt.plot(self.timestep_plot,self.vent_plot)
+        ax_2.set_xlabel('Time in 15 min steps')
+        ax_2.set_ylabel('Ventilation rate [mm]/[s]')
+
+        ax_3 = plt.subplot(4,2,3)
+        plt.plot(self.timestep_plot,self.supply_energy_plot)
+        ax_3.set_xlabel('Time in 15 min steps')
+        ax_3.set_ylabel('Energy supply by heating the system [W]/[m^2]')
+
+        ax_4 = plt.subplot(4,2,4)
+        plt.plot(self.timestep_plot,self.dry_weight_plot)
+        ax_4.set_xlabel('Time in 15 min steps')
+        ax_4.set_ylabel('Lettuce dry weight [g]/[m^2]')
+
+        ax_5 = plt.subplot(4, 2, 5)
+        plt.plot(self.timestep_plot,self.indoor_co2_plot)
+        ax_5.set_xlabel('Time in 15 min steps')
+        ax_5.set_ylabel('Indoor CO¬2 concentration [ppm]')
+
+        ax_6 = plt.subplot(4, 2, 6)
+        plt.plot(self.timestep_plot,self.temp_plot)
+        ax_6.set_xlabel('Time in 15 min steps')
+        ax_6.set_ylabel('Indoor air temperature [C]')
+
+        ax_7 = plt.subplot(4, 2, 7)
+        plt.plot(self.timestep_plot,self.rh_plot)
+        ax_7.set_xlabel('Time in 15 min steps')
+        ax_7.set_ylabel('Indoor relative humidity [%]')
+
+        plt.show()
+
+        return
