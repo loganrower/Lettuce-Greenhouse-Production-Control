@@ -57,9 +57,6 @@ class LettuceGreenhouse(gym.Env):
 
         self.action_space = spaces.Box(low=-1*np.ones(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
 
-
-
-
         ## state space
         ### continuous space given with no upper or lower bounds
         ### shape is of ny+nd*Np 
@@ -68,7 +65,6 @@ class LettuceGreenhouse(gym.Env):
         #### Initial Four Measurements... (Current of State Variables)
         #### Then we have Future Predictions for the Four State Variables... (Future Prediction of State Variables)
         #### The observation space is then split up 
-
 
         ## QUESTION FOR BART
         #   # Changed this so it has box that holds all the range of values low an dhigh for the current and future observation
@@ -140,15 +136,12 @@ class LettuceGreenhouse(gym.Env):
 
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
-        print("Action:", action)
-        print("Denorm Action:", action_denorm)
-        print("Max Action:",self.min_action)
-        print("Min Action:", self.max_action)
-        print("Old State:",self.old_state)
         obs = self.f(action_denorm, self.d[self.timestep])
-
-        ## for this new observation we apply clipping to ensure the new state falls in the range...
-        obs = np.clip(obs, self.obs_low, self.obs_high)
+        print("Shape of New",obs.shape)
+        ## If observation is not in range then kill it...
+        # if obs not in range(self.obs_low, self.obs_high):
+        #     # Terminate...
+        #     done = terminal_state()
         ## See if the current state is within the appropriate range of values...
         print("Current State:", obs)
         # 3. Check whether state is terminal
@@ -176,10 +169,13 @@ class LettuceGreenhouse(gym.Env):
         # return obs , reward, done, {}
         ### dont need to worry about info it can just be an empty dictionary
 
+        ## Here we need to add in the environmental data to the observation....
+        ### for loop 20 times..
+
         self.old_state = obs
-        observation  = np.zeros((84,))
-        observation[:4] = [obs[0],obs[1],obs[2],obs[3]]
-        observation = np.array(observation , dtype=np.float32)
+        for i in range(20):
+            obs = np.concatenate((obs, self.d[self.timestep+i]))
+        observation = np.array(obs , dtype=np.float32)
         print("-------------------------------------------------",)
         return observation, reward, done, {}
 
@@ -462,7 +458,9 @@ class LettuceGreenhouse(gym.Env):
         # way to compute next time step
         ki =  np.array([
             p["alfaBeta"]*(
-            (1-np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] * (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"]) / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])))- p["Wc_a"] * x[0] * 2**(0.1 * x[2] - 2.5),
+            (1-np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] * (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * 
+            (x[1] - p["photGamma"]) / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * 
+            (x[1] - p["photGamma"])))- p["Wc_a"] * x[0] * 2**(0.1 * x[2] - 2.5),
 
             1 / p["CO2cap"] * (
             -((1 - np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] *
