@@ -29,3 +29,10 @@
 
         - Needed to change the start date from 40 to 90 in order to start end of march, and went over 40 days in order to capture more data...
             - Since we are only using natural lighting so we want to plant in spring and that is more realistic..
+        
+        - Errors stemming from large or really small states
+            - Changed the obsevations bounds from -inf and +inf to the obs low and obs high
+
+            - also changed action to be from 0 to 1...
+
+            - then i also used clip since the issue with PPO is with the state space since it acccounts for the action space in the algorithm but we need to enforce the state space range ourselves... using np.clip()

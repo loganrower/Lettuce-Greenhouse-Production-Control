@@ -33,7 +33,7 @@ TIMESTEPS = 10000
 
 # How many timesteps do we want to do... so we are going to run this for a really long time to see our results..
 ## in our case we could do a while True, or even just a for loop that would do many iterations of 10000 so in this case I will do 100 so up to 1,000,000 timesteps essentiallt
-for i in range(1,100):
+for i in range(1,10):
 
     # model will reset the number of timesteps that it has already taken the model object
     # model.learn would reset the timesteps it is at but... do reset_num_timesteps = FALSE

@@ -24,7 +24,7 @@ class LettuceGreenhouse(gym.Env):
         c=86400,              # conversion to seconds
         nDays= 20,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
-        startDay=150,          # start day of simulation (start in march day 90, initial started at 40)
+        startDay=90,          # start day of simulation (start in march day 90, initial started at 40)
         ):
         """
         Greenhouse environment class, implemented as an OpenAI gym environment.
@@ -55,7 +55,10 @@ class LettuceGreenhouse(gym.Env):
         ##  # -	Ventilation rate [mm/s]
         ##  # -	Energy supply by heating the system [W/m2]
 
-        self.action_space = spaces.Box(low=np.zeros(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
+        self.action_space = spaces.Box(low=-1*np.ones(nu, dtype=np.float32), high=np.ones(nu, dtype=np.float32))
+
+
+
 
         ## state space
         ### continuous space given with no upper or lower bounds
@@ -65,15 +68,26 @@ class LettuceGreenhouse(gym.Env):
         #### Initial Four Measurements... (Current of State Variables)
         #### Then we have Future Predictions for the Four State Variables... (Future Prediction of State Variables)
         #### The observation space is then split up 
-        self.observation_space = spaces.Box(low=0, high=np.inf, shape=(ny + nd*Np,))
+
+
+        ## QUESTION FOR BART
+        #   # Changed this so it has box that holds all the range of values low an dhigh for the current and future observation
+        #   # I made this change because I was getting nan errors and though current state was the issue, and it is because its nan...
+        #   #
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(ny + nd*Np,))
+
+
 
         # lower and upper bounds on observations
         self.obs_low = np.array([0., 0., 10., 0.], dtype=np.float32)
         self.obs_high = np.array([7., 1.6, 20., 70.], dtype=np.float32)
 
+
         # lower and upper bounds on the actions
         self.min_action = np.array([0., 0., 0.], dtype=np.float32)
         self.max_action = np.array([1.2, 7.5, 150.], dtype=np.float32)
+
+
 
         self.p = DefineParameters()
 
@@ -122,13 +136,21 @@ class LettuceGreenhouse(gym.Env):
         ## Denormalization -> x = x_norm*(xmax - xmin) + xmin
         ## So the normalization was done into make it easier for agent to explore the action space
         ## Need to convert back so then we can consider the environment 
-        action_denorm = action*(self.max_action - self.min_action) + self.min_action
+        action_denorm = (1+action)*(self.max_action - self.min_action)/(2 + self.min_action)
 
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
+        print("Action:", action)
+        print("Denorm Action:", action_denorm)
+        print("Max Action:",self.min_action)
+        print("Min Action:", self.max_action)
         print("Old State:",self.old_state)
         obs = self.f(action_denorm, self.d[self.timestep])
-        print("Current State:", obs[0])
+
+        ## for this new observation we apply clipping to ensure the new state falls in the range...
+        obs = np.clip(obs, self.obs_low, self.obs_high)
+        ## See if the current state is within the appropriate range of values...
+        print("Current State:", obs)
         # 3. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
@@ -187,7 +209,7 @@ class LettuceGreenhouse(gym.Env):
         ## first compute the total expense
 
         ### cost of CO2 (CO2 added)
-        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2*s]
+        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2*s] * s *(1g/1000mg) *(1kg/1000g)
         #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
         #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
         #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
@@ -440,11 +462,7 @@ class LettuceGreenhouse(gym.Env):
         # way to compute next time step
         ki =  np.array([
             p["alfaBeta"]*(
-            (1-np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] *
-            (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"]) 
-            / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])))
-            - p["Wc_a"] * x[0] * 2**(0.1 * x[2] - 2.5)
-            ,
+            (1-np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] * (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"]) / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])))- p["Wc_a"] * x[0] * 2**(0.1 * x[2] - 2.5),
 
             1 / p["CO2cap"] * (
             -((1 - np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] *
@@ -460,5 +478,6 @@ class LettuceGreenhouse(gym.Env):
             1/p["H2Ocap"] * ((1 - np.exp(-p["laiW"] * x[0])) * p["evap_c_a"] * (p["satH2O1"]/(p["R"]*(x[2]+p["T"]))*
             np.exp(p["satH2O2"] * x[2] / (x[2] + p["satH2O3"])) - x[3]) - (u[1]/1e3 + p["leak"]) * (x[3] - d[3]))]
             )
+        print(ki)
         return ki
 
