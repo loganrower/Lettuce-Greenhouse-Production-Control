@@ -23,7 +23,7 @@ class LettuceGreenhouse(gym.Env):
         nu=3,                 # number of control inputs
         h=15*60,              # sampling period (15 minutes, 900 seconds...)
         c=86400,              # conversion to seconds
-        nDays= 20,              # simulation days
+        nDays= 2,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
         startDay=90,          # start day of simulation
         ):
@@ -69,8 +69,8 @@ class LettuceGreenhouse(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(ny + nd*Np,))
 
         # lower and upper bounds on observations
-        self.obs_low = np.array([0., 0., 10., 0.], dtype=np.float32)
-        self.obs_high = np.array([7., 1.6, 20., 70.], dtype=np.float32)
+        self.obs_low = np.array([0., 0., 0., 0.], dtype=np.float32)
+        self.obs_high = np.array([7., 1.6, 30., 70.], dtype=np.float32) # changed max temp to be 30 C cause lettuce can grow at a max of around 29 C
 
         # lower and upper bounds on the actions
         self.min_action = np.array([0., 0., 0.], dtype=np.float32)
@@ -91,6 +91,9 @@ class LettuceGreenhouse(gym.Env):
         self.cum_reward = 0
         ## State Old
         self.old_state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
+        ## the done state -> for when program is finished
+        ### initialize to False
+        self.done =  False
 
         #plot variables
         self.dry_weight_plot =[]
@@ -137,10 +140,8 @@ class LettuceGreenhouse(gym.Env):
         ## Need to convert back so then we can consider the environment 
 
         action_denorm = (1+action)*(self.max_action - self.min_action)/(2 + self.min_action)
-        self.supply_co2_plot.append(action_denorm[0])
-        self.vent_plot.append(action_denorm[1])
-        self.supply_energy_plot.append(action_denorm[2])
-        #print("Action:", action_denorm)
+
+        print("Action:", action_denorm)
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
         #print("Old State:",self.old_state)
@@ -152,19 +153,19 @@ class LettuceGreenhouse(gym.Env):
             obs_high_val = self.obs_high[idx]
             obs_low_val = self.obs_low[idx]
             if obs_val < obs_low_val or obs_val > obs_high_val: 
+                print("time:", self.timestep )
+                print("state outside range:", obs_val, (obs_low_val,obs_high_val ))
                 # go to end state
-                self.timestep =  self.N
-                # done is now true...
-                done = self.terminal_state()
-                # check to see if actions are out of bounds...
+                self.done = True
+        #check to see if actions are out of bounds...
         for idx, act_val in enumerate(action_denorm):
             action_high_val = self.max_action[idx]
             action_low_val = self.min_action[idx]
             if act_val < action_low_val or act_val > action_high_val: 
                 # go to end state
-                self.timestep =  self.N
-                # done is now true...
-                done = self.terminal_state()
+                print("time:", self.timestep )
+                print("action outside range:", act_val, (action_low_val,action_high_val ))
+                self.done = True
 
         measurement = self.g()
         self.dry_weight_plot.append(measurement[0])
@@ -172,6 +173,9 @@ class LettuceGreenhouse(gym.Env):
         self.temp_plot.append(measurement[2])
         self.rh_plot.append(measurement[3])
         self.timestep_plot.append(self.timestep)
+        self.supply_co2_plot.append(action_denorm[0])
+        self.vent_plot.append(action_denorm[1])
+        self.supply_energy_plot.append(action_denorm[2])
         # print("Current temperature:", obs[2])
 
 
@@ -193,9 +197,11 @@ class LettuceGreenhouse(gym.Env):
         # 5. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
-        ##
-
-        done = self.terminal_state()
+        
+        ## First see if self.done has been set to True 
+        if self.done != True: 
+            # if it hasnt then check if it is true based on terminal state..
+            self.done = self.terminal_state()
         ## Here we need to add in the environmental data to the observation....
         ### for loop 20 times..
 
@@ -203,8 +209,17 @@ class LettuceGreenhouse(gym.Env):
         for i in range(20):
             obs = np.concatenate((obs, self.d[self.timestep+i]))
         observation = np.array(obs , dtype=np.float32)
-        print("-------------------------------------------------",)
-        return observation, reward, done, {}
+
+
+        # Now we will add our data that we will be plotting to info
+        ## info is a dictionary that is able to be accessed locally...
+        info = {}
+        info["timestep_plot"] = self.timestep_plot
+        info["supply_co2_plot"] = self.supply_co2_plot 
+        info['indoor_co2_plot'] = self.indoor_co2_plot
+
+        print("--------",)
+        return observation, reward, self.done, info
 
     def reward_function(self, obs, action):
         """
@@ -297,7 +312,7 @@ class LettuceGreenhouse(gym.Env):
         #print("Total Expenses",total_expenses)
         #print("Weight change: " + str((obs[0]-self.old_state[0])*1000))
         self.weight_change += (obs[0]-self.old_state[0])*1000
-        print("Net Profit", net_profit)
+        #print("Net Profit", net_profit)
         #print("Cumulative Reward", self.cum_reward)
         # self.cum_reward += net_profit
         return net_profit
@@ -323,6 +338,19 @@ class LettuceGreenhouse(gym.Env):
         # 2. Reset variables of environment to initial values
         self.timestep = 0
         self.cum_reward = 0
+        self.done = 0
+        #plot variables
+        self.dry_weight_plot =[]
+        self.indoor_co2_plot = []
+        self.temp_plot = []
+        self.rh_plot = []
+        self.supply_co2_plot = []
+        self.vent_plot = []
+        self.supply_energy_plot = []
+        self.timestep_plot = []
+
+        #Weight variable
+        self.weight_change = 0
         # 3. Return first observation
 
         return observation
@@ -331,12 +359,12 @@ class LettuceGreenhouse(gym.Env):
     # Function to check terminal state:
     def terminal_state(self):
         if self.N == self.timestep:
-            done = True
+            self.done = True
             #self.printer()
         else:
-            done = False
+            self.done = False
             self.timestep += 1
-        return done
+        return self.done
 
     def close(self):
         return
