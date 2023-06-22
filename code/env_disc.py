@@ -24,7 +24,7 @@ class LettuceGreenhouse(gym.Env):
                  nu=3,  # number of control inputs
                  h=15 * 60,  # sampling period (15 minutes, 900 seconds...)
                  c=86400,  # conversion to seconds
-                 nDays=48,  # simulation days
+                 nDays=14,  # simulation days
                  Np=20,  # number of future predictions (20 == 5hrs)
                  startDay=90,  # start day of simulation
                  ):
@@ -89,7 +89,7 @@ class LettuceGreenhouse(gym.Env):
         self.state_init = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         self.state = self.state_init
 
-        #self.obs = self.state_init
+        # self.obs = self.state_init
         self.timestep = 0
         self.cum_reward = 0
         ## State Old
@@ -111,7 +111,7 @@ class LettuceGreenhouse(gym.Env):
         self.weight_change_plot = []
 
         # Weight variable
-        self.weight_change = 0
+        self.weight_change_step = 0
 
         # number of variables
         self.Np = Np
@@ -145,6 +145,7 @@ class LettuceGreenhouse(gym.Env):
         old_measurement = self.g()
         print("Old State:", self.g())
         obs = self.f(action_denorm, self.d[self.timestep])
+        print(obs[0])
         print("New state: ", self.g())
         new_measurement = self.g()
         self.dry_weight_plot.append(new_measurement[0])
@@ -160,8 +161,8 @@ class LettuceGreenhouse(gym.Env):
         # 3. Compute reward from profit of greenhouse
         reward = self.reward_function(obs, action_denorm)
 
-        self.weight_change = (new_measurement[0] - old_measurement[0])
-        self.weight_change_plot.append(self.weight_change)
+        self.weight_change_step = (new_measurement[0] - old_measurement[0])
+        self.weight_change_plot.append(self.weight_change_step)
 
         # 5. Check whether state is terminal
         ## First see if self.done has been set to True 
@@ -169,8 +170,7 @@ class LettuceGreenhouse(gym.Env):
             # if it hasnt then check if it is true based on terminal state..
             self.done = self.terminal_state()
 
-
-        self.old_state = obs
+        self.old_state = obs.copy()
         print("--------", )
 
         return obs, reward, self.done, {}
@@ -214,10 +214,10 @@ class LettuceGreenhouse(gym.Env):
                 "productPrice2"]  # Auction Price of Lettuce €/m^2
 
         # 2. return reward
-        net_profit = float((total_revenue) - (total_expenses))
+        net_profit = float(total_revenue - total_expenses)
 
-
-        self.profit_plot.append(net_profit)
+        self.profit_plot.append(net_profit*100)
+        self.cum_reward += net_profit
 
         return net_profit
 
@@ -253,7 +253,7 @@ class LettuceGreenhouse(gym.Env):
         self.timestep_plot = []
 
         # Weight variable
-        self.weight_change = 0
+        self.weight_change_step = 0
         # 3. Return first observation
 
         return observation
@@ -309,18 +309,18 @@ class LettuceGreenhouse(gym.Env):
         ## Then increase heating
 
         #### PUT BOUNDS SO DONT GO OUTSIDE ACTION SPACE....
-        low_th = 15.00  # C
-        high_th = 25.0  # C
+        low_th = 5.00  # C
+        high_th = 20.0  # C
 
         #### PLACED BOUNDS SO THAT THE ACTIONS WERE NOT INCREASED
 
         if obs[2] < low_th:
             ## This means it is outside the lower bound and we need to increase temperature...
             ### decrease the ventilation,
-            if action[1] >= 0.25:
+            if action[1] >= -0.75:
                 action[1] -= 0.25
             else:
-                action[1] = 0.0
+                action[1] = -1.0
                 ### increase the energy for heating
             if action[2] <= 0.75:
                 action[2] += 0.25
@@ -334,10 +334,10 @@ class LettuceGreenhouse(gym.Env):
             else:
                 action[1] = 1.0
             ### decrease the energy for heating
-            if action[2] >= 0.25:
+            if action[2] >= -0.75:
                 action[2] -= 0.25
             else:
-                action[2] = 0.0
+                action[2] = -1.0
 
         # this is a normalized action and is what will be inputted into the step function...
 
@@ -396,7 +396,7 @@ class LettuceGreenhouse(gym.Env):
                     (1 - np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] *
                     (-p["photCO2_1"] * x[2] ** 2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])
                     / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2] ** 2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (
-                        x[1] - p["photGamma"])))
+                    x[1] - p["photGamma"])))
             - p["Wc_a"] * x[0] * 2 ** (0.1 * x[2] - 2.5)
             ,
 
@@ -404,9 +404,9 @@ class LettuceGreenhouse(gym.Env):
                     -((1 - np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] *
                       (-p["photCO2_1"] * x[2] ** 2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])
                       / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2] ** 2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (
-                                        x[1] - p["photGamma"])))
+                                    x[1] - p["photGamma"])))
                     + p["CO2c_a"] * x[0] * 2 ** (0.1 * x[2] - 2.5) + u[0] / 1e6 - (u[1] / 1e3 + p["leak"]) * (
-                                x[1] - d[1])
+                            x[1] - d[1])
             ),
 
             1 / p["aCap"] * (
@@ -414,15 +414,15 @@ class LettuceGreenhouse(gym.Env):
             ),
 
             1 / p["H2Ocap"] * (
-                        (1 - np.exp(-p["laiW"] * x[0])) * p["evap_c_a"] * (p["satH2O1"] / (p["R"] * (x[2] + p["T"])) *
-                                                                           np.exp(p["satH2O2"] * x[2] / (
-                                                                                       x[2] + p["satH2O3"])) - x[3]) - (
-                                    u[1] / 1e3 + p["leak"]) * (x[3] - d[3]))]
+                    (1 - np.exp(-p["laiW"] * x[0])) * p["evap_c_a"] * (p["satH2O1"] / (p["R"] * (x[2] + p["T"])) *
+                                                                       np.exp(p["satH2O2"] * x[2] / (
+                                                                               x[2] + p["satH2O3"])) - x[3]) - (
+                            u[1] / 1e3 + p["leak"]) * (x[3] - d[3]))]
         )
         return ki
 
     def printer(self):
-        print("Final weight change: " + str(self.weight_change))
+        print("Final weight change: " + str(self.g()[0]) + "g")
         plt.figure(figsize=(15, 15))
 
         ax_1 = plt.subplot(5, 2, 1)
@@ -464,10 +464,12 @@ class LettuceGreenhouse(gym.Env):
         ax_8 = plt.subplot(5, 2, 8)
         plt.plot(self.timestep_plot, self.profit_plot)
         ax_8.set_xlabel('Time in 15 min steps')
-        ax_8.set_ylabel('Profit per timestep [€]')
+        ax_8.set_ylabel('Profit per timestep [€ cent]')
 
         ax_9 = plt.subplot(5, 2, 9)
         plt.plot(self.timestep_plot, self.weight_change_plot)
         ax_9.set_xlabel('Time in 15 min steps')
         ax_9.set_ylabel('Weight change in [g]')
         plt.show()
+
+        print("cumulative reward: ", self.cum_reward*100, "in € cent")
