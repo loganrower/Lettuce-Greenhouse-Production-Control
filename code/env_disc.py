@@ -41,6 +41,7 @@ class LettuceGreenhouse(gym.Env):
         super(LettuceGreenhouse, self).__init__()
 
         # simulation parameters
+
         self.h = h  # sampling period, the data is taken every 15 minutes
         self.c = c
         self.nDays = nDays
@@ -85,9 +86,10 @@ class LettuceGreenhouse(gym.Env):
         ## -	Indoor CO¬2 concentration [kg/m3]
         ## -	Indoor air temperature [C]
         ## -	Indoor humidity [kg/m¬3]
-
-        self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         self.state_init = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
+        self.state = self.state_init
+
+        #self.obs = self.state_init
         self.timestep = 0
         self.cum_reward = 0
         ## State Old
@@ -105,6 +107,8 @@ class LettuceGreenhouse(gym.Env):
         self.vent_plot = []
         self.supply_energy_plot = []
         self.timestep_plot = []
+        self.profit_plot = []
+        self.weight_change_plot = []
 
         # Weight variable
         self.weight_change = 0
@@ -138,14 +142,15 @@ class LettuceGreenhouse(gym.Env):
 
         print("Action:", action_denorm)
         # 2. Transition state to next state given action and observe environment
-        print("Old State:", self.old_state)
+        old_measurement = self.g()
+        print("Old State:", self.g())
         obs = self.f(action_denorm, self.d[self.timestep])
-
-        measurement = self.g()
-        self.dry_weight_plot.append(measurement[0])
-        self.indoor_co2_plot.append(measurement[1])
-        self.temp_plot.append(measurement[2])
-        self.rh_plot.append(measurement[3])
+        print("New state: ", self.g())
+        new_measurement = self.g()
+        self.dry_weight_plot.append(new_measurement[0])
+        self.indoor_co2_plot.append(new_measurement[1])
+        self.temp_plot.append(new_measurement[2])
+        self.rh_plot.append(new_measurement[3])
         self.timestep_plot.append(self.timestep)
         self.supply_co2_plot.append(action_denorm[0])
         self.vent_plot.append(action_denorm[1])
@@ -155,14 +160,15 @@ class LettuceGreenhouse(gym.Env):
         # 3. Compute reward from profit of greenhouse
         reward = self.reward_function(obs, action_denorm)
 
+        self.weight_change = (new_measurement[0] - old_measurement[0])
+        self.weight_change_plot.append(self.weight_change)
+
         # 5. Check whether state is terminal
         ## First see if self.done has been set to True 
         if self.done != True:
             # if it hasnt then check if it is true based on terminal state..
             self.done = self.terminal_state()
 
-        ## Here we need to add in the environmental data to the observation....
-        ### for loop 20 times..
 
         self.old_state = obs
         print("--------", )
@@ -177,96 +183,42 @@ class LettuceGreenhouse(gym.Env):
         Args:
             - obs: observation of environment (should be 4 values)
             - action: action of agent
-        
-        Returns: reward
-
-        Ex: maximize profit of greenhouse
-        - need to maximize the lettuce dry weight -> This is a state...
-        - need to minmize energy supply by heating system, ventilation rate, and supply rate of CO2 -> these are actions...
-        
-        total revenue - total expenses
-
-        ONLY TESTING WITH TOTAL REVENUE FOR ASSIGNMENT STEP 3
         """
-
-        # TODO: implement reward function.
-        # Main goals of this functions are to:
-        # 1. Compute reward of greenhouse (e.g., profit of the greenhouse)
-        ## first compute the total expense
-
-        ### cost of CO2 (CO2 added)
-        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2*s] * s *(1g/1000mg) *(1kg/1000g)
-        #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
-        #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
-        #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
-        co2_units = 1 / (
-                    1000 * 1000)  # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
-        cost_CO2 = self.p["co2Cost"] * action[0] * (co2_units) * self.h  # euro/m^2 Cost CO2
-        ### COST OF ENERGY:
-        """
-        Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
-        ## Will likely ommit the cost of lighting for now...
+        # cost of CO2 (CO2 added)
+        co2_units = 1 / (1000 * 1000)  # convert action to kg
+        cost_CO2 = self.p["co2Cost"] * action[0] * co2_units * self.h  # euro/m^2 Cost CO2
 
         """
-        ## Heating Energy Costs
-
-        # ## What else to energy because that would be an action right not a state? if energy consumed was a state then that would work
-        #### but there is no energy state just an action
-
-        ### ventilation cost
-
-        #### first need to compute the total ventilation rate to understand the intended and unintended airflow in the system
-        # ### This means including the leakage and ventilation rate together 
-        # ### tot_ventilation = ((Ventilation Rate [mm/s])*(1 m/1000mm)) +  Ventilation Leakage [m/s]
+        Cost of Energy = [Cost of Ventilation] + Cost of Heating
+        """
+        # Ventilation cost
         tot_vent = (action[1] / 1000) + self.p["leak"]
-        #### Now our final cost equation related to energy expenditure for ventilation is as follows:
-        #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * (Total Ventilation Rate (I/O) [m/s])* Cost of Energy [euro/J] *Indoor Air Temp (Current) [°C] * timestep (s)
-        cost_vent = self.p["ventCap"] * tot_vent * self.p["energyCost"] * obs[
-            2] * self.h  # euro/m^2 Cost of Energy Related to Ventilation
+        cost_vent = self.p["ventCap"] * tot_vent * self.p["energyCost"] * obs[2] * self.h  # euro/m^2
 
-        ### The cost of heating
-        #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [W/m^2] (Convert from W to Joule/s)
-        #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [J/(s*(m^2))] * timestep (seconds)
-        heat_cost = self.p["energyCost"] * action[2] * self.h  ## [e]uro/m^2]
+        # The cost of heating
+        heat_cost = self.p["energyCost"] * action[2] * self.h  # [€/m^2]
 
-        ### Total cost of energy [euro/m^2]
+        # Total cost of energy [€/m^2]
         total_cost_energy = heat_cost + cost_vent
 
-        ## total expenses [euro/m^2]
+        # total expenses [€/m^2]
         total_expenses = total_cost_energy + cost_CO2
 
-        ## next compute thte total revenue
-        ### Revenue is determined based on dry weight of crop, yield and price of crop
-        ### Yield -> It quantifies the proportion of lettuce produced relative to the dry weight.
-        ### Dry Weight -> weight of lettuce after removing the moisture content
-        ### combining the yield factor and dry weight gives a better indication of the amount of lettuce to be sold
-        ### Price of Lettuce -> euro/kg
-        ### Equation for Lettuce Profit = Lettuce Dry Weight [kg/m^2] * Yield Factor [-] * Price of Lettuce [euro/kg]
-        ### THE LETTUCE PRICE PARAMETER SEEMS VERY STRANGE.... 
-        ### INSTEAD OF LETTUCE PRICE PARAMETER SHOULD I USE self.p["productPrice1"] which is around .81 but the units are also confusing for this ASK BART!
-        ##### ORIGINAL EQUATION....
-        #####total_revenue = obs[0]*self.p["alfaBeta"] *self.p["lettucePrice"]  # [euro/m^2]
-        ##### Equation... https://www.sciencedirect.com/science/article/pii/S0967066108001019#bib22
-        ##### auc_price = productPrice1 [euro/m^2] + (Lettuce Dry Weight [kg/m^2] * Dry Weight to Wet Weight Ratio * productPrice2 [euro/(kg)])
-        #### auc_price = [euro/m^2] + [euro/m^2]
+        # Calculate total revenue.
         if self.timestep == 0:
             total_revenue = (abs(self.old_state[0] - obs[0]) * self.p["productPrice2"]) + self.p[
-                "productPrice1"]  # Auction Price of Lettuce euro/m^2
+                "productPrice1"]  # Auction Price of Lettuce €/m^2
         else:
-            # dont add the extra..
+            # don't add p2
             total_revenue = (abs(self.old_state[0] - obs[0])) * self.p[
-                "productPrice2"]  # Auction Price of Lettuce euro/m^2
+                "productPrice2"]  # Auction Price of Lettuce €/m^2
 
-        # 2. return reward|
+        # 2. return reward
         net_profit = float((total_revenue) - (total_expenses))
-        # print("timestep:",self.timestep)
-        # print("Total Rev", total_revenue)
-        # print("Total Expenses",total_expenses)
-        # print("Weight change: " + str((obs[0]-self.old_state[0])*1000))
-        self.weight_change += (obs[0] - self.old_state[0]) * 1000
-        # print("Net Profit", net_profit)
-        # print("Cumulative Reward", self.cum_reward)
-        # self.cum_reward += net_profit
+
+
+        self.profit_plot.append(net_profit)
+
         return net_profit
 
     def reset(self):
@@ -283,7 +235,7 @@ class LettuceGreenhouse(gym.Env):
         # 1. Reset state of environment to initial state
         ## Need to make sure that it is same shape as the observation environment...
         self.state = self.state_init  # self.state needs to be changed for the f()
-        observation = np.zeros((84,))
+        observation = np.zeros((4,))
         observation[:4] = [self.state_init[0], self.state_init[1], self.state_init[2], self.state_init[3]]
         observation = np.array(observation, dtype=np.float32)
         # 2. Reset variables of environment to initial values
@@ -473,39 +425,49 @@ class LettuceGreenhouse(gym.Env):
         print("Final weight change: " + str(self.weight_change))
         plt.figure(figsize=(15, 15))
 
-        ax_1 = plt.subplot(4, 2, 1)
+        ax_1 = plt.subplot(5, 2, 1)
         plt.plot(self.timestep_plot, self.supply_co2_plot)
         # ax_1.set_title('')
         ax_1.set_xlabel('Time in 15 min steps')
         ax_1.set_ylabel('Supply rate of carbon dioxide [mg]/[m^2][s]')
 
-        ax_2 = plt.subplot(4, 2, 2)
+        ax_2 = plt.subplot(5, 2, 2)
         plt.plot(self.timestep_plot, self.vent_plot)
         ax_2.set_xlabel('Time in 15 min steps')
         ax_2.set_ylabel('Ventilation rate [mm]/[s]')
 
-        ax_3 = plt.subplot(4, 2, 3)
+        ax_3 = plt.subplot(5, 2, 3)
         plt.plot(self.timestep_plot, self.supply_energy_plot)
         ax_3.set_xlabel('Time in 15 min steps')
         ax_3.set_ylabel('Energy supply by heating the system [W]/[m^2]')
 
-        ax_4 = plt.subplot(4, 2, 4)
+        ax_4 = plt.subplot(5, 2, 4)
         plt.plot(self.timestep_plot, self.dry_weight_plot)
         ax_4.set_xlabel('Time in 15 min steps')
         ax_4.set_ylabel('Lettuce dry weight [g]/[m^2]')
 
-        ax_5 = plt.subplot(4, 2, 5)
+        ax_5 = plt.subplot(5, 2, 5)
         plt.plot(self.timestep_plot, self.indoor_co2_plot)
         ax_5.set_xlabel('Time in 15 min steps')
         ax_5.set_ylabel('Indoor CO¬2 concentration [ppm]')
 
-        ax_6 = plt.subplot(4, 2, 6)
+        ax_6 = plt.subplot(5, 2, 6)
         plt.plot(self.timestep_plot, self.temp_plot)
         ax_6.set_xlabel('Time in 15 min steps')
         ax_6.set_ylabel('Indoor air temperature [C]')
-        ax_7 = plt.subplot(4, 2, 7)
+
+        ax_7 = plt.subplot(5, 2, 7)
         plt.plot(self.timestep_plot, self.rh_plot)
         ax_7.set_xlabel('Time in 15 min steps')
         ax_7.set_ylabel('Indoor relative humidity [%]')
 
+        ax_8 = plt.subplot(5, 2, 8)
+        plt.plot(self.timestep_plot, self.profit_plot)
+        ax_8.set_xlabel('Time in 15 min steps')
+        ax_8.set_ylabel('Profit per timestep [€]')
+
+        ax_9 = plt.subplot(5, 2, 9)
+        plt.plot(self.timestep_plot, self.weight_change_plot)
+        ax_9.set_xlabel('Time in 15 min steps')
+        ax_9.set_ylabel('Weight change in [g]')
         plt.show()
