@@ -26,7 +26,7 @@ class LettuceGreenhouse(gym.Env):
                  c=86400,  # conversion to seconds
                  nDays=14,  # simulation days
                  Np=20,  # number of future predictions (20 == 5hrs)
-                 startDay=90,  # start day of simulation
+                 startDay=0,  # start day of simulation
                  ):
         """
         Greenhouse environment class, implemented as an OpenAI gym environment.
@@ -309,7 +309,7 @@ class LettuceGreenhouse(gym.Env):
         ## Then increase heating
 
         #### PUT BOUNDS SO DONT GO OUTSIDE ACTION SPACE....
-        low_th = 5.00  # C
+        low_th = -5.00  # C
         high_th = 20.0  # C
 
         #### PLACED BOUNDS SO THAT THE ACTIONS WERE NOT INCREASED
