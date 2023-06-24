@@ -178,14 +178,14 @@ class EvalCallback(BaseCallback):
 # Define hyperparameters
 hyperparameters = {
     'learning_rate': 0.001,
-    'ent_coef': 0.0001,
-    #'n_steps': 96, # number of steps before policy update... so go a full day...
-    #'n_epochs': 500, # number of times collected experience will be used for updating policy
-    'vf_coef': 0.5,
+    'ent_coef': 0.01,
+    'n_steps': 96, # number of steps before policy update... so go a full day...
+    'n_epochs': 500, # number of times collected experience will be used for updating policy
+    'vf_coef': 0.2,
     'n_epochs': 10,
-    'batch_size': 64,
+    #'batch_size': 64,
     'clip_range': 0.2,
-    'gamma': 0.90
+    'gamma': 0.95
 }
 # Create the callback object
 callback = CustomCallback()
@@ -205,7 +205,7 @@ modelppo = PPO('MlpPolicy', gh,**hyperparameters,verbose=1, tensorboard_log=logd
 
 # # Timesteps
 TIMESTEPS = 10000
-for i in range(1,10):
+for i in range(5):
     # Pass the callback object to the model's `learn()` method
     modelppo.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False)
     # now save model

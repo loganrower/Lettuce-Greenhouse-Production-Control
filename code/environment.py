@@ -299,21 +299,21 @@ class LettuceGreenhouse(gym.Env):
         ## the first section computes the price of lettuce based on change in dry weight....so how much revenue we will get
         # r_CO2 -> Reward for CO2... will reward  if controlled satisfactorly within given range, and penalty for if outside range...
 
-        if obs[1] < 7e-4: # 
-            r_CO2 = -cr_co2_1*(obs[1]-7e-4)**2
+        if self.indoorco2 < 7e-4: # 
+            r_CO2 = -cr_co2_1*(self.indoorco2-7e-4)**2
 
-        elif obs[1] > 15e-4: 
-            r_CO2 = -cr_co2_1*(obs[1]-15e-4)**2
+        elif self.indoorco2 > 15e-4: 
+            r_CO2 = -cr_co2_1*(self.indoorco2-15e-4)**2
         else:
             r_CO2 = cr_co2_2 
     
         # r_T -> Reward for temerature to also keep it within a specified range...
 
-        if obs[2] < 5: # 5 C
-            r_T = -cr_t_1 *(obs[2]-5)**2
+        if self.indoortemp < 5: # 5 C
+            r_T = -cr_t_1 *(self.indoortemp-5)**2
 
-        elif obs[2] > 30:  # 30C
-            r_T = -cr_t_1 *(obs[2]-30)**2
+        elif self.indoortemp > 30:  # 30C
+            r_T = -cr_t_1 *(self.indoortemp-30)**2
         else:
             r_T = cr_t_2
 

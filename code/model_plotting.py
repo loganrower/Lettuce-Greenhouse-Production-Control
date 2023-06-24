@@ -11,7 +11,7 @@ seed = 2
 # Loaded in the model that was desired
 ## This model version is the model that has +1, -1 reward and +100 reward at specific state
 #model = PPO.load("models_method2/1687571802/1687572264.zip")
-model = PPO.load("models/1687607344/10000.zip")
+model = PPO.load("models/1687624760/10000.zip")
 # create the environment
 gh = LettuceGreenhouse()
 
@@ -37,10 +37,10 @@ ep_rewards = [] # cumulative per episode
 timestep = []
 
 # Function to save the plot for a single episode
-def ep_plots(timestep, ep_rewards,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,supply_energy,ep_rew, episode_num):
+def ep_plots(timestep,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,supply_energy, episode_num):
     print("Plotting")
     ## Make a new directory for episode
-    save_path = f'Rew_Method_3_Plots/MinMax_{episode_num}/'
+    save_path = f'Rew_Method_3_Plots/corrected_{episode_num}/'
     os.makedirs(save_path, exist_ok=True) 
     # Plotting code for this episode's data
     # Customize the plot as needed
@@ -82,10 +82,10 @@ def ep_plots(timestep, ep_rewards,dry_weight,indoor_co2,indoor_temp,rh,supply_co
     ax_7.set_xlabel('Time in 15 min steps')
     ax_7.set_ylabel('Indoor relative humidity [%]')
 
-    ax_8 = plt.subplot(4,2, 8)
-    plt.plot(timestep,ep_rew)
-    ax_8.set_xlabel('Time in 15 min steps')
-    ax_8.set_ylabel('Episode Rewards Over Time')
+    # ax_8 = plt.subplot(4,2, 8)
+    # plt.plot(timestep,ep_rew)
+    # ax_8.set_xlabel('Time in 15 min steps')
+    # ax_8.set_ylabel('Episode Rewards Over Time')
 
     # Save the figure:
     plt.savefig(save_path + f'episode_{episode_num}_plot.png')
@@ -102,20 +102,19 @@ while not done:
     obs, reward, done, infos = gh.step(action)
     # finally append values to the lists...
     print(done)
-    ep_rewards.append(reward)
-    timestep.append(gh.timestep)
-    dry_weight.append(obs[0])
-    indoor_co2.append(obs[1])
-    indoor_temp.append(obs[2])
-    rh.append(obs[3])
-    supply_co2.append(action[0])
-    vent.append(action[1])
-    supply_energy.append(action[2])
-
     
-
-net_prof = infos['net_profit']
+info =  infos
+net_prof = info['net_profit']
+##
+timestep = info["timestep_plot"] 
+dry_weight = info['dry_weight'] 
+indoor_co2 = info['indoor_co2'] 
+temp = info['temp'] 
+rh = info['rh'] 
+supply_co2 = info["supply_co2"] 
+vent = info['vent_plot'] 
+supply_energy = info['supply_energy']
 print("Net Profit:", net_prof)
-ep_plots(timestep, ep_rewards,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,supply_energy,ep_rewards,2 )
+ep_plots(timestep, dry_weight,indoor_co2,temp ,rh,supply_co2,vent,supply_energy,1)
 
 
