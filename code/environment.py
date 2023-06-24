@@ -5,7 +5,7 @@ The AML-project on greenhouse control with RL can use this as a starting point.
 Greenhouse dyanmics are modelled as a class of the OpenAI Gym environment.
 The controller for this environment control the valves of the greenhouse.
 That regulates amount of heating (W/m2) and carbon dioxide into the greenhouse.
-""" 
+"""
 import numpy as np
 from utils import co2dens2ppm, vaporDens2rh, load_disturbances, DefineParameters
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ from gym import spaces
 
 class LettuceGreenhouse(gym.Env):
 
-    def __init__(self, 
+    def __init__(self,
         weather_data_dir="weatherData\outdoorWeatherWurGlas2014.mat",
         ny=4,                 # number of greenhouse measurement variables
         nx=4,                 # number of state variables
@@ -152,7 +152,7 @@ class LettuceGreenhouse(gym.Env):
         for idx, obs_val in enumerate(obs):
             obs_high_val = self.obs_high[idx]
             obs_low_val = self.obs_low[idx]
-            if obs_val < obs_low_val or obs_val > obs_high_val: 
+            if obs_val < obs_low_val or obs_val > obs_high_val:
                 print("time:", self.timestep )
                 print("state outside range:", obs_val, (obs_low_val,obs_high_val ))
                 # go to end state
@@ -161,7 +161,7 @@ class LettuceGreenhouse(gym.Env):
         for idx, act_val in enumerate(action_denorm):
             action_high_val = self.max_action[idx]
             action_low_val = self.min_action[idx]
-            if act_val < action_low_val or act_val > action_high_val: 
+            if act_val < action_low_val or act_val > action_high_val:
                 # go to end state
                 print("time:", self.timestep )
                 print("action outside range:", act_val, (action_low_val,action_high_val ))
@@ -186,7 +186,7 @@ class LettuceGreenhouse(gym.Env):
         ### Ex: focus on the production of lettuce...
         ### The function will then steer what the algorithm will focus on...
 
-        
+
         reward = self.reward_function(obs, action_denorm)
 
         # 4. return observation, reward, done, info
@@ -197,9 +197,9 @@ class LettuceGreenhouse(gym.Env):
         # 5. Check whether state is terminal
         ## how do we know if it is a terminal state... based on if end of simulation so if it has been 2days...
         ## so we will just add one to the timestep since there are 192 periods that we are sampling from
-        
+
         ## First see if self.done has been set to True 
-        if self.done != True: 
+        if self.done != True:
             # if it hasnt then check if it is true based on terminal state..
             self.done = self.terminal_state()
         ## Here we need to add in the environmental data to the observation....
@@ -215,68 +215,58 @@ class LettuceGreenhouse(gym.Env):
         ## info is a dictionary that is able to be accessed locally...
         info = {}
         info["timestep_plot"] = self.timestep_plot
-        info["supply_co2_plot"] = self.supply_co2_plot 
+        info["supply_co2_plot"] = self.supply_co2_plot
         info['indoor_co2_plot'] = self.indoor_co2_plot
 
         print("--------",)
         return observation, reward, self.done, info
 
     def reward_function(self, obs, action):
-        """
-        This function computes the reward for the greenhouse environment.
-        Is called after simulating the environment for one timestep.
-        Uses observation and action to compute reward, e.g., profit of greenhouse.
-        Args:
-            - obs: observation of environment (should be 4 values)
-            - action: action of agent
-        
-        Returns: reward
 
-        Ex: maximize profit of greenhouse
-        - need to maximize the lettuce dry weight -> This is a state...
-        - need to minmize energy supply by heating system, ventilation rate, and supply rate of CO2 -> these are actions...
-        
-        total revenue - total expenses
+        cr_1 = 16/2.20371
+        cr_u1 = -4.5360e-4
+        cr_u2 = -7.5e-3
+        cr_u3 = -8.5725e-4
+        cr_co2_1 = 0.1
+        cr_co2_2 = 5e-4
+        cr_t_1 = 1e-3
+        cr_t_2 = 5e-4
+        co2_max = 15e-4
+        co2_min = 7e-4
+        t_min = 5
+        t_max = 30
 
-        ONLY TESTING WITH TOTAL REVENUE FOR ASSIGNMENT STEP 3
-        """
+        r_dryweight = cr_1*(obs[0]-self.old_state[0])
 
-        #TODO: implement reward function.
-        # Main goals of this functions are to:
-        # 1. Compute reward of greenhouse (e.g., profit of the greenhouse)
-        ## first compute the total expense
+        if obs[1] < co2_min:
+            r_co2 = -cr_co2_1*np.pow((obs[1]-co2_min),2)
+        elif obs[1] > co2_max:
+            r_co2 = -cr_co2_1 * np.pow((obs[1] - co2_max), 2)
+        else:
+            r_co2 = cr_co2_2
 
-        ### cost of CO2 (CO2 added)
-        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2*s] * s *(1g/1000mg) *(1kg/1000g)
-        #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
-        #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
-        #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
+        if obs[2] < t_min:
+            r_t = -cr_t_1*np.pow((obs[2]-t_min),2)
+        elif obs[2] > t_max:
+            r_t = -cr_t_1 * np.pow((obs[2] - t_max), 2)
+        else:
+            r_t = cr_t_2
+
+        c_u1 = cr_u1*action[0]
+        c_u2 = cr_u2*action[1]
+        c_u3 = cr_u3*action[3]
+        cost_control = c_u1 + c_u2 + c_u3
+
+        reward = r_dryweight + r_co2 + r_t - cost_control
+
         co2_units = 1/(1000*1000) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
         cost_CO2 = self.p["co2Cost"] * action[0]*(co2_units)*self.h # euro/m^2 Cost CO2
-        ### COST OF ENERGY:
-        """
-        Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
-        ## Will likely ommit the cost of lighting for now...
 
-        """
-        ## Heating Energy Costs
-
-        # ## What else to energy because that would be an action right not a state? if energy consumed was a state then that would work
-                #### but there is no energy state just an action
-        
-        ### ventilation cost
-        
-        #### first need to compute the total ventilation rate to understand the intended and unintended airflow in the system
-        # ### This means including the leakage and ventilation rate together 
-        # ### tot_ventilation = ((Ventilation Rate [mm/s])*(1 m/1000mm)) +  Ventilation Leakage [m/s]
         tot_vent = (action[1]/1000) + self.p["leak"]
         #### Now our final cost equation related to energy expenditure for ventilation is as follows:
         #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * (Total Ventilation Rate (I/O) [m/s])* Cost of Energy [euro/J] *Indoor Air Temp (Current) [°C] * timestep (s)
         cost_vent = self.p["ventCap"]*tot_vent*self.p["energyCost"]*obs[2]*self.h #euro/m^2 Cost of Energy Related to Ventilation
-        
-        ### The cost of heating
-        #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [W/m^2] (Convert from W to Joule/s)
-        #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [J/(s*(m^2))] * timestep (seconds)
+
         heat_cost =  self.p["energyCost"] * action[2] * self.h ## [e]uro/m^2]
 
         ### Total cost of energy [euro/m^2]
@@ -285,20 +275,6 @@ class LettuceGreenhouse(gym.Env):
         ## total expenses [euro/m^2]
         total_expenses = total_cost_energy + cost_CO2
 
-        ## next compute thte total revenue
-        ### Revenue is determined based on dry weight of crop, yield and price of crop
-        ### Yield -> It quantifies the proportion of lettuce produced relative to the dry weight.
-        ### Dry Weight -> weight of lettuce after removing the moisture content
-        ### combining the yield factor and dry weight gives a better indication of the amount of lettuce to be sold
-        ### Price of Lettuce -> euro/kg
-        ### Equation for Lettuce Profit = Lettuce Dry Weight [kg/m^2] * Yield Factor [-] * Price of Lettuce [euro/kg]
-        ### THE LETTUCE PRICE PARAMETER SEEMS VERY STRANGE.... 
-        ### INSTEAD OF LETTUCE PRICE PARAMETER SHOULD I USE self.p["productPrice1"] which is around .81 but the units are also confusing for this ASK BART!
-        ##### ORIGINAL EQUATION....
-        #####total_revenue = obs[0]*self.p["alfaBeta"] *self.p["lettucePrice"]  # [euro/m^2]
-        ##### Equation... https://www.sciencedirect.com/science/article/pii/S0967066108001019#bib22
-        ##### auc_price = productPrice1 [euro/m^2] + (Lettuce Dry Weight [kg/m^2] * Dry Weight to Wet Weight Ratio * productPrice2 [euro/(kg)])
-        #### auc_price = [euro/m^2] + [euro/m^2]
         if self.timestep == 0:
             total_revenue = (abs(self.old_state[0] - obs[0])*self.p["productPrice2"] )+ self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
         else:
@@ -315,8 +291,8 @@ class LettuceGreenhouse(gym.Env):
         #print("Net Profit", net_profit)
         #print("Cumulative Reward", self.cum_reward)
         # self.cum_reward += net_profit
-        return net_profit
-    
+        return reward
+
 
     def reset(self):
         """
@@ -354,7 +330,7 @@ class LettuceGreenhouse(gym.Env):
         # 3. Return first observation
 
         return observation
-    
+
 
     # Function to check terminal state:
     def terminal_state(self):
@@ -438,10 +414,10 @@ class LettuceGreenhouse(gym.Env):
                 action[2] = 0.0
 
         # this is a normalized action and is what will be inputted into the step function...
-        
+
         return action
 
-        
+
 
     def f(self, action, d):
         """
@@ -471,7 +447,7 @@ class LettuceGreenhouse(gym.Env):
 
         Returns
             y   --  measurements of the environment
-        """ 
+        """
         y = np.array([1e3*self.state[0],
                 1e-3*co2dens2ppm(self.state[2],self.state[1]),
                 self.state[2],
@@ -494,7 +470,7 @@ class LettuceGreenhouse(gym.Env):
         ki =  np.array([
             p["alfaBeta"]*(
             (1-np.exp(-p["laiW"] * x[0])) * p["photI0"] * d[0] *
-            (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"]) 
+            (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])
             / (p["photI0"] * d[0] + (-p["photCO2_1"] * x[2]**2 + p["photCO2_2"] * x[2] - p["photCO2_3"]) * (x[1] - p["photGamma"])))
             - p["Wc_a"] * x[0] * 2**(0.1 * x[2] - 2.5)
             ,
