@@ -9,7 +9,7 @@ That regulates amount of heating (W/m2) and carbon dioxide into the greenhouse.
 import numpy as np
 from utils import co2dens2ppm, vaporDens2rh, load_disturbances, DefineParameters
 import matplotlib.pyplot as plt
-
+import copy
 import gym
 from gym import spaces
 
@@ -23,7 +23,7 @@ class LettuceGreenhouse(gym.Env):
         nu=3,                 # number of control inputs
         h=15*60,              # sampling period (15 minutes, 900 seconds...)
         c=86400,              # conversion to seconds
-        nDays= 2,              # simulation days
+        nDays= 1,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
         startDay=90,          # start day of simulation
         ):
@@ -69,8 +69,12 @@ class LettuceGreenhouse(gym.Env):
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(ny + nd*Np,))
 
         # lower and upper bounds on observations
-        self.obs_low = np.array([0., 0., 0., 0.], dtype=np.float32)
-        self.obs_high = np.array([7., 1.6, 30., 70.], dtype=np.float32) # changed max temp to be 30 C cause lettuce can grow at a max of around 29 C
+        self.obs_low = np.array([0., 0.,0, 0.], dtype=np.float32)
+        ## first changed max temp [2] from 20 to 30 since lettuce can grow at max of around 29C
+        ## but then we changed the bounds to be 0 to +inf for the states
+        ### ORIGINAL STATES: 7, 1.6, 30, 70
+        ### CHANGED TO....
+        self.obs_high = np.array([7.,1.6, 30, 70], dtype=np.float32) # changed max temp to be 30 C cause lettuce can grow at a max of around 29 C
 
         # lower and upper bounds on the actions
         self.min_action = np.array([0., 0., 0.], dtype=np.float32)
@@ -88,12 +92,20 @@ class LettuceGreenhouse(gym.Env):
         self.state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         self.state_init = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
         self.timestep = 0
-        self.cum_reward = 0
-        ## State Old
-        self.old_state = np.array([0.0035, 1e-3, 15, 0.008], dtype=np.float32)
+ 
         ## the done state -> for when program is finished
         ### initialize to False
         self.done =  False
+        ## intitialize the net profit sum
+        self.net_prof_cum = 0 
+        ### measurement inividual values
+        measurement = self.g()
+        self.dryweight = measurement[0]
+        self.indoorco2 = measurement[1]
+        self.indoortemp = measurement[2]
+        self.indoorrh = measurement[3]
+        ## State Old
+        self.old_state = np.array([self.dryweight,self.indoorco2, self.indoortemp,self.indoorrh], dtype=np.float32)
 
         #plot variables
         self.dry_weight_plot =[]
@@ -104,7 +116,7 @@ class LettuceGreenhouse(gym.Env):
         self.vent_plot = []
         self.supply_energy_plot = []
         self.timestep_plot = []
-
+        self.info = {}
         #Weight variable
         self.weight_change = 0
 
@@ -137,35 +149,18 @@ class LettuceGreenhouse(gym.Env):
         ## Normalization -> x_norm = (x - xmin) / (xmax - xmin)
         ## Denormalization -> x = x_norm*(xmax - xmin) + xmin
         ## So the normalization was done into make it easier for agent to explore the action space
-        ## Need to convert back so then we can consider the environment 
-
+        ## Need to convert back so then we can consider the environment
+        #print("Initial ACtion:", action)
         action_denorm = (1+action)*(self.max_action - self.min_action)/(2 + self.min_action)
 
         print("Action:", action_denorm)
         # 2. Transition state to next state given action and observe environment
         ## obs = next_state
-        #print("Old State:",self.old_state)
+        
         obs = self.f(action_denorm, self.d[self.timestep])
-
+ 
+        #print("State:",obs)
         #obs = np.clip(obs, self.min_action, self.max_action)
-        # check to see if observations are out of bounds
-        for idx, obs_val in enumerate(obs):
-            obs_high_val = self.obs_high[idx]
-            obs_low_val = self.obs_low[idx]
-            if obs_val < obs_low_val or obs_val > obs_high_val: 
-                print("time:", self.timestep )
-                print("state outside range:", obs_val, (obs_low_val,obs_high_val ))
-                # go to end state
-                self.done = True
-        #check to see if actions are out of bounds...
-        for idx, act_val in enumerate(action_denorm):
-            action_high_val = self.max_action[idx]
-            action_low_val = self.min_action[idx]
-            if act_val < action_low_val or act_val > action_high_val: 
-                # go to end state
-                print("time:", self.timestep )
-                print("action outside range:", act_val, (action_low_val,action_high_val ))
-                self.done = True
 
         measurement = self.g()
         self.dry_weight_plot.append(measurement[0])
@@ -178,6 +173,10 @@ class LettuceGreenhouse(gym.Env):
         self.supply_energy_plot.append(action_denorm[2])
         # print("Current temperature:", obs[2])
 
+        self.dryweight = measurement[0]
+        self.indoorco2 = measurement[1]
+        self.indoortemp = measurement[2]
+        self.indoorrh = measurement[3]
 
         # 3. Compute reward from profit of greenhouse
         ## how good action was....
@@ -202,120 +201,172 @@ class LettuceGreenhouse(gym.Env):
         if self.done != True: 
             # if it hasnt then check if it is true based on terminal state..
             self.done = self.terminal_state()
+        
+        if obs[0] < 0 :
+            self.done = True
+
         ## Here we need to add in the environmental data to the observation....
         ### for loop 20 times..
 
-        self.old_state = obs
-        for i in range(20):
+        self.old_state = np.array([self.dryweight,self.indoorco2, self.indoortemp,self.indoorrh], dtype=np.float32)
+
+        for i in range(1,21):# 1 to 20...
             obs = np.concatenate((obs, self.d[self.timestep+i]))
         observation = np.array(obs , dtype=np.float32)
 
+        # observation  = np.zeros((84,))
+        # observation[:4] = [obs[0],obs[1],obs[2],obs[3]]
+        # observation = np.array(observation , dtype=np.float32)
 
         # Now we will add our data that we will be plotting to info
         ## info is a dictionary that is able to be accessed locally...
-        info = {}
-        info["timestep_plot"] = self.timestep_plot
-        info["supply_co2_plot"] = self.supply_co2_plot 
-        info['indoor_co2_plot'] = self.indoor_co2_plot
+        self.info["timestep_plot"] = self.timestep_plot
+        self.info['dry_weight'] =self.dry_weight_plot
+        self.info['indoor_co2'] = self.indoor_co2_plot
+        self.info['temp'] = self.temp_plot
+        self.info['rh'] = self.rh_plot
+        self.info["supply_co2"] = self.supply_co2_plot 
+        self.info['vent_plot'] = self.vent_plot
+        self.info['supply_energy'] = self.supply_energy_plot
+        self.info['net_profit'] = self.net_prof_cum 
 
-        print("--------",)
-        return observation, reward, self.done, info
+        #print("--------",)
+        return observation, reward, self.done, self.info
 
     def reward_function(self, obs, action):
+
+
         """
-        This function computes the reward for the greenhouse environment.
-        Is called after simulating the environment for one timestep.
-        Uses observation and action to compute reward, e.g., profit of greenhouse.
-        Args:
-            - obs: observation of environment (should be 4 values)
-            - action: action of agent
-        
-        Returns: reward
+        This function will compute the reward for the greenhouse using the equations from
 
-        Ex: maximize profit of greenhouse
-        - need to maximize the lettuce dry weight -> This is a state...
-        - need to minmize energy supply by heating system, ventilation rate, and supply rate of CO2 -> these are actions...
-        
-        total revenue - total expenses
+        Reinforcement Learning Versus Model Predictive Control on Greenhouse Climate Control
 
-        ONLY TESTING WITH TOTAL REVENUE FOR ASSIGNMENT STEP 3
+        Notes:
+        In the paper the vector u refers to the actions, and y to the states...
+
+        The paper also defines a time varying bound but this was not included for the sake of simplicitiy...
+
+        So the overall reward function is as follows:
+
+        reward =  r_rev + r_CO2 + r_T - r_controls
+
+        r_rev = self.p["productPrice2"]*abs(self.old_state[0] - obs[0]))
+                - the first section computes the price of lettuce based on change in dry weight....so how much revenue we will get
+
+            r_CO2 -> Reward for CO2... will reward  if controlled satisfactorly within given range, and penalty for if outside range...
+
+            if obs[1] < self.obs_low[1]:
+                r_CO2 = -cr_co2_1*(obs[1]-self.obs_low[1])**2
+
+            elif obs[1] > self.obs_high[1]: 
+                r_CO2 = -cr_co2_1*(obs[1]-self.obs_high[1])**2
+            else:
+                r_CO2 = cr_co2_2 
+            
+
+            r_T -> Reward for temerature to also keep it within a specified range...
+
+            if obs[2] < self.obs_low[2]:
+                r_T = -cr_t_1 *(obs[2]-self.obs_low[2])**2
+
+            elif obs[2] > self.obs_high[2]: 
+                r_T = -cr_t_1 *(obs[2]-self.obs_high[2])**2
+            else:
+                r_T = cr_t_2
+
+
+            ## now for the last bit of the reward we need to compute the affect of tuning the controls..
+            #r_controls = r_supp_co2 + r_vent + r_heat
+            r_supp_co2 = *action[0]
+
+
+    
         """
+        # additional constants:
+        ## CO2 -> constants
+        cr_co2_1 = .1
+        cr_co2_2 =  .0005  
+        ## Temperature Constants...
+        cr_t_1 = .001
+        cr_t_2 = .0005
 
-        #TODO: implement reward function.
-        # Main goals of this functions are to:
-        # 1. Compute reward of greenhouse (e.g., profit of the greenhouse)
-        ## first compute the total expense
+        ## Parameters for the Control
+        cr_u1 = -4.5360e-4
+        cr_u2 = -.0075
+        cr_u3 = -8.5725e-4
 
-        ### cost of CO2 (CO2 added)
-        ##### cost of CO2 = CO2_Cost [€ kg^{-1}{CO2}] *  Supply Rate of CO2[mg/m2*s] * s *(1g/1000mg) *(1kg/1000g)
-        #    ### What about using the CO2 Supply Rate.... This is more with respect to the cost to supply CO2...
-        #    ### What about amount observed indoors as apart of the state? Amount of CO2 Observed Indoors (state[1])[kg/m3]
-        #    ### What about CO2_Capacity [m^3{air} m^{-2}{gh}]
+        r_rev = self.p["productPrice2"]*(self.dryweight - self.old_state[0])
+        ## the first section computes the price of lettuce based on change in dry weight....so how much revenue we will get
+        # r_CO2 -> Reward for CO2... will reward  if controlled satisfactorly within given range, and penalty for if outside range...
+
+        if obs[1] < 7e-4: # 
+            r_CO2 = -cr_co2_1*(obs[1]-7e-4)**2
+
+        elif obs[1] > 15e-4: 
+            r_CO2 = -cr_co2_1*(obs[1]-15e-4)**2
+        else:
+            r_CO2 = cr_co2_2 
+    
+        # r_T -> Reward for temerature to also keep it within a specified range...
+
+        if obs[2] < 5: # 5 C
+            r_T = -cr_t_1 *(obs[2]-5)**2
+
+        elif obs[2] > 30:  # 30C
+            r_T = -cr_t_1 *(obs[2]-30)**2
+        else:
+            r_T = cr_t_2
+
+        ## now for the last bit of the reward we need to compute the affect of tuning the controls..
+        #r_controls = r_supp_co2 + r_vent + r_heat
+        r_supp_co2 = cr_u1*action[0]
+        r_vent = cr_u2*action[1]
+        r_heat = cr_u3*action[2]
+        r_controls = r_supp_co2 + r_vent + r_heat
+
+        # Now finalize the reward
+        reward =  r_rev + r_CO2 + r_T + r_controls
+
+
+
+        ## Now compute the net profit... As a single value
+        ## First compute the CO2 cost...
         co2_units = 1/(1000*1000) # convert action to kg and divide by the amount of time elapsed in the timestep (seconds)
         cost_CO2 = self.p["co2Cost"] * action[0]*(co2_units)*self.h # euro/m^2 Cost CO2
-        ### COST OF ENERGY:
-        """
-        Cost of Energy = Cost of Lighting + [Cost of Ventilation] + Cost of Heating
-        ## Will likely ommit the cost of lighting for now...
-
-        """
-        ## Heating Energy Costs
-
-        # ## What else to energy because that would be an action right not a state? if energy consumed was a state then that would work
-                #### but there is no energy state just an action
-        
-        ### ventilation cost
-        
-        #### first need to compute the total ventilation rate to understand the intended and unintended airflow in the system
-        # ### This means including the leakage and ventilation rate together 
-        # ### tot_ventilation = ((Ventilation Rate [mm/s])*(1 m/1000mm)) +  Ventilation Leakage [m/s]
+        ## Ventilation Cost
         tot_vent = (action[1]/1000) + self.p["leak"]
         #### Now our final cost equation related to energy expenditure for ventilation is as follows:
         #### The Ventilation Capacity[J m^{-3}°C^{-1}]  * (Total Ventilation Rate (I/O) [m/s])* Cost of Energy [euro/J] *Indoor Air Temp (Current) [°C] * timestep (s)
         cost_vent = self.p["ventCap"]*tot_vent*self.p["energyCost"]*obs[2]*self.h #euro/m^2 Cost of Energy Related to Ventilation
-        
+
         ### The cost of heating
         #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [W/m^2] (Convert from W to Joule/s)
         #### heat_cost =  cost of energy [euro/J] * Energy Supply by heating the system [J/(s*(m^2))] * timestep (seconds)
         heat_cost =  self.p["energyCost"] * action[2] * self.h ## [e]uro/m^2]
 
+        
         ### Total cost of energy [euro/m^2]
         total_cost_energy = heat_cost + cost_vent
 
         ## total expenses [euro/m^2]
         total_expenses = total_cost_energy + cost_CO2
 
-        ## next compute thte total revenue
-        ### Revenue is determined based on dry weight of crop, yield and price of crop
-        ### Yield -> It quantifies the proportion of lettuce produced relative to the dry weight.
-        ### Dry Weight -> weight of lettuce after removing the moisture content
-        ### combining the yield factor and dry weight gives a better indication of the amount of lettuce to be sold
-        ### Price of Lettuce -> euro/kg
-        ### Equation for Lettuce Profit = Lettuce Dry Weight [kg/m^2] * Yield Factor [-] * Price of Lettuce [euro/kg]
-        ### THE LETTUCE PRICE PARAMETER SEEMS VERY STRANGE.... 
-        ### INSTEAD OF LETTUCE PRICE PARAMETER SHOULD I USE self.p["productPrice1"] which is around .81 but the units are also confusing for this ASK BART!
-        ##### ORIGINAL EQUATION....
-        #####total_revenue = obs[0]*self.p["alfaBeta"] *self.p["lettucePrice"]  # [euro/m^2]
-        ##### Equation... https://www.sciencedirect.com/science/article/pii/S0967066108001019#bib22
-        ##### auc_price = productPrice1 [euro/m^2] + (Lettuce Dry Weight [kg/m^2] * Dry Weight to Wet Weight Ratio * productPrice2 [euro/(kg)])
-        #### auc_price = [euro/m^2] + [euro/m^2]
+
         if self.timestep == 0:
-            total_revenue = (abs(self.old_state[0] - obs[0])*self.p["productPrice2"] )+ self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
+            total_revenue = (abs(self.old_state[0] - self.dryweight)*self.p["productPrice2"] ) #+ self.p["productPrice1"] # Auction Price of Lettuce euro/m^2
         else:
             # dont add the extra..
-            total_revenue = (abs(self.old_state[0] - obs[0]))*self.p["productPrice2"]   # Auction Price of Lettuce euro/m^2
+            total_revenue = (abs(self.old_state[0] - self.dryweight))*self.p["productPrice2"]   # Auction Price of Lettuce euro/m^2
 
-        # 2. return reward|
-        net_profit = float((total_revenue) - (total_expenses))
-        #print("timestep:",self.timestep)
-        #print("Total Rev", total_revenue)
-        #print("Total Expenses",total_expenses)
-        #print("Weight change: " + str((obs[0]-self.old_state[0])*1000))
-        self.weight_change += (obs[0]-self.old_state[0])*1000
-        #print("Net Profit", net_profit)
-        #print("Cumulative Reward", self.cum_reward)
-        # self.cum_reward += net_profit
-        return net_profit
+        net_profit = float((total_revenue) - (total_expenses))*100
+     
+
+        self.net_prof_cum += net_profit
+
+        self.weight_change += (self.dryweight-self.old_state[0])
+
+        return reward
+
     
 
     def reset(self):
@@ -332,12 +383,17 @@ class LettuceGreenhouse(gym.Env):
         # 1. Reset state of environment to initial state
         ## Need to make sure that it is same shape as the observation environment...
         self.state = self.state_init # self.state needs to be changed for the f()
-        observation  = np.zeros((84,))
-        observation[:4] = [self.state_init[0],self.state_init[1],self.state_init[2],self.state_init[3]]
-        observation = np.array(observation , dtype=np.float32)
+        ### measurement inividual values
+        measurement = self.g()
+        self.dryweight = measurement[0]
+        self.indoorco2 = measurement[1]
+        self.indoortemp = measurement[2]
+        self.indoorrh = measurement[3]
+
+        obs = copy.deepcopy(self.state)
         # 2. Reset variables of environment to initial values
         self.timestep = 0
-        self.cum_reward = 0
+        self.net_prof_cum = 0 
         self.done = 0
         #plot variables
         self.dry_weight_plot =[]
@@ -348,9 +404,12 @@ class LettuceGreenhouse(gym.Env):
         self.vent_plot = []
         self.supply_energy_plot = []
         self.timestep_plot = []
-
+        self.info = {}
         #Weight variable
         self.weight_change = 0
+        for i in range(1,21):
+            obs = np.concatenate((obs, self.d[self.timestep+i]))
+        observation = np.array(obs , dtype=np.float32)
         # 3. Return first observation
 
         return observation
