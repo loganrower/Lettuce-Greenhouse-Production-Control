@@ -24,9 +24,9 @@ class LettuceGreenhouse(gym.Env):
                  nu=3,  # number of control inputs
                  h=15 * 60,  # sampling period (15 minutes, 900 seconds...)
                  c=86400,  # conversion to seconds
-                 nDays=40,  # simulation days
+                 nDays=7,  # simulation days
                  Np=20,  # number of future predictions (20 == 5hrs)
-                 startDay=90,  # start day of simulation
+                 startDay=150,  # start day of simulation
                  ):
         """
         Greenhouse environment class, implemented as an OpenAI gym environment.
@@ -206,12 +206,11 @@ class LettuceGreenhouse(gym.Env):
 
         # Calculate total revenue.
         if self.timestep == 0:
-            total_revenue = (abs(self.old_state[0] - obs[0]) * self.p["productPrice2"]) + self.p[
+            total_revenue = ((obs[0] - self.old_state[0]) * self.p["productPrice2"]) + self.p[
                 "productPrice1"]  # Auction Price of Lettuce €/m^2
         else:
-            # don't add p2
-            total_revenue = (abs(self.old_state[0] - obs[0])) * self.p[
-                "productPrice2"]  # Auction Price of Lettuce €/m^2
+            # don't add p1
+            total_revenue = (obs[0] - self.old_state[0]) * self.p["productPrice2"]  # Auction Price of Lettuce €/m^2
 
         # 2. return reward
         net_profit = float(total_revenue - total_expenses)
