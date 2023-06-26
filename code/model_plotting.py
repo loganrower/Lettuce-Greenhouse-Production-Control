@@ -4,14 +4,17 @@ from environment import LettuceGreenhouse
 import os
 # import time
 import matplotlib.pyplot as plt
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.utils import set_random_seed
 # import numpy as np
 
-seed = 2
+seed_value = 42  # Replace with your desired seed value
+set_random_seed(seed_value)
 
 # Loaded in the model that was desired
 ## This model version is the model that has +1, -1 reward and +100 reward at specific state
 #model = PPO.load("models_method2/1687571802/1687572264.zip")
-model = PPO.load("models/1687624760/10000.zip")
+model = PPO.load("models/1687696845/best_model.zip")
 # create the environment
 gh = LettuceGreenhouse()
 
@@ -37,10 +40,22 @@ ep_rewards = [] # cumulative per episode
 timestep = []
 
 # Function to save the plot for a single episode
-def ep_plots(timestep,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,supply_energy, episode_num):
+def ep_reward(timestep,ep_rewards):
+    save_path = f'Best_Plots/final_model/'
+    os.makedirs(save_path, exist_ok=True) 
+    plt.figure(figsize=(15,15))
+    plt.plot(timestep,ep_rewards)
+    #ax_1.set_title('')
+    save_path = f'Best_Plots/final_model/'
+    plt.xlabel('Time in 15 min steps')
+    plt.ylabel('Cumulative Reward over 1 Episode')
+    plt.savefig(save_path + f'reward_plot.png')
+    plt.close()  # Close the plot window after each plot
+
+def ep_plots(timestep,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,supply_energy):
     print("Plotting")
     ## Make a new directory for episode
-    save_path = f'Rew_Method_3_Plots/corrected_{episode_num}/'
+    save_path = f'Best_Plots/final_model/'
     os.makedirs(save_path, exist_ok=True) 
     # Plotting code for this episode's data
     # Customize the plot as needed
@@ -88,13 +103,14 @@ def ep_plots(timestep,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,suppl
     # ax_8.set_ylabel('Episode Rewards Over Time')
 
     # Save the figure:
-    plt.savefig(save_path + f'episode_{episode_num}_plot.png')
+    plt.savefig(save_path + f'action_state_final_plot.png')
     plt.close()  # Close the plot window after each plot
 
 ep_num = 10
 done =  False
 # for i in range(ep_num):
 netprof_val = 0
+cum_rew = 0
 while not done:
     # first predict the next action using the observation
     action, _ = model.predict(obs)
@@ -102,6 +118,8 @@ while not done:
     obs, reward, done, infos = gh.step(action)
     # finally append values to the lists...
     print(done)
+    cum_rew += reward
+    ep_rewards.append(cum_rew)
     
 info =  infos
 net_prof = info['net_profit']
@@ -114,7 +132,11 @@ rh = info['rh']
 supply_co2 = info["supply_co2"] 
 vent = info['vent_plot'] 
 supply_energy = info['supply_energy']
+
+ep_plots(timestep, dry_weight,indoor_co2,temp ,rh,supply_co2,vent,supply_energy)
+ep_reward(timestep,ep_rewards)
+
+mean_reward, std_reward = evaluate_policy(model, gh, n_eval_episodes=10)
+print(f"The mean reward is {mean_reward} and the standard deviation of the reward is {std_reward}")
 print("Net Profit:", net_prof)
-ep_plots(timestep, dry_weight,indoor_co2,temp ,rh,supply_co2,vent,supply_energy,1)
-
-
+print("Cumulative Reward:", cum_rew)

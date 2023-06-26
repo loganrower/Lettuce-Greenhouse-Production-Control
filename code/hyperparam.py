@@ -15,6 +15,8 @@ def objective(trial):
     learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-3, log=True)
     ent_coef = trial.suggest_float('ent_coef', 0.0, 0.2)
     batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
+    batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
+    batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
 
     # Create and train the PPO model with the current hyperparameter configuration
     model = PPO("MlpPolicy", gh, learning_rate=learning_rate, ent_coef=ent_coef, batch_size=batch_size)
@@ -37,9 +39,9 @@ best_ent_coef = best_params['ent_coef']
 best_batch_size = best_params['batch_size']
 
 
-models_dir = f"models_method2/{int(time.time())}/"
+models_dir = f"models_method3/{int(time.time())}/"
 # Directory for the logs
-logdir = f"logs_method2/{int(time.time())}/"
+logdir = f"logs/{int(time.time())}/"
 
 # Create the Directories if they don't already exist
 if not os.path.exists(models_dir):

@@ -45,6 +45,7 @@ class LettuceGreenhouse(gym.Env):
         self.nDays = nDays
         self.L = nDays*c # two simulation days in seconds
         self.N = self.L//self.h ## 192 steps
+        self.startDay = np.random.randint(0,301)
 
         # action and observation spaces
         ## action space
@@ -127,7 +128,7 @@ class LettuceGreenhouse(gym.Env):
         self.nd = nd
 
         # loadin weather predictions
-        self.d = load_disturbances(c, self.L, h , nd, Np, startDay, weather_data_dir)
+        self.d = load_disturbances(c, self.L, h , nd, Np, self.startDay, weather_data_dir)
 
     def step(self, action):
         """
@@ -290,7 +291,7 @@ class LettuceGreenhouse(gym.Env):
         cr_co2_1 = .1
         cr_co2_2 = .0005  
         ## Temperature Constants...
-        cr_t_1 = .001 *20 # changed this so we give more penalty for temp out of range....
+        cr_t_1 = .001 *20# # changed this so we give more penalty for temp out of range....
         cr_t_2 = .0005
 
         ## Parameters for the Control
@@ -418,6 +419,7 @@ class LettuceGreenhouse(gym.Env):
         observation = np.array(obs , dtype=np.float32)
         # 3. Return first observation
 
+        self.startDay = np.random.randint(0,301)
 
         return observation
     
