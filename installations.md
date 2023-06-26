@@ -49,3 +49,4 @@ then go to directory where log files are..
 then run following:
 
 tensorboard --logdir ./logs/
+
