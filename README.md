@@ -59,3 +59,8 @@ Boersma S, van Mourik S. 2021. Nonlinear sample-based MPC in a Greenhouse with L
     * `eval_env.py`
     * `gh_eval.py`
 - First ensure that the evalulation environment has the parameters appropriately set for the experiment you would like to run. Next, go into the `gh_eval` file. This file will save plots into the `Best_Plots` directory, and specifically `eval_model`. There are currently some plots from previous runs that have been documented in `bestmodels.md` so if wanting to run one of those models you should achieve the same results if you change the zip file that you are loading in to the appropriate name from `bestmodels.md` or if there is a newer model that you would like to run then go into the models directory and copy the relative path for the zip file. 
+
+
+**Report**
+ If wanting to view the report on this project then see the report in the report directory. This report outlines various experiments that were conducted with these environments, and analyzes the various reward functions and methods performed. 
+ 
