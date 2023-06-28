@@ -33,16 +33,16 @@ Boersma S, van Mourik S. 2021. Nonlinear sample-based MPC in a Greenhouse with L
 
 
 **Method 1: Deterministic Policy Testing**
-- Files:
+- Files the user can edit or run these files are found under the code directory:
     * `run_env_disc.ipynb`
     * `env_disc.py`
 - A separate gymnasium environment was created for this deterministic policy. To examine the policy that is used go into the `env_disc.py` file. To see the performance of this deterministic policy run the Jupyter Notebook `run_env_disc.ipynb`. This Jupyter Notebook will provide some statistics and plots for the user.
 
 
 **Method 2: Training PPO Reinforcement Learning Algorithm**
-- Files:
-    * environment.py
-    * gh_learn.py
+- Files the user can edit or run these files are found under the code directory:
+    * `environment.py`
+    * `gh_learn.py`
 
 - To train any Reinforcment Learning Algorithm in this project first go to the `environment.py` file which illustrates the simulation time in days, start day as well as other parameters that have already been preset. These parameters can be changed within the `LettuceGreenhouse` class for whatever you would like to test. 
 
@@ -55,7 +55,7 @@ Boersma S, van Mourik S. 2021. Nonlinear sample-based MPC in a Greenhouse with L
 - This training is so far only been conducted with PPO
 
 **Method 3: Evaluating the trained models**
-- Files:
+- Files the user can edit or run these files are found under the code directory:
     * `eval_env.py`
     * `gh_eval.py`
 - First ensure that the evalulation environment has the parameters appropriately set for the experiment you would like to run. Next, go into the `gh_eval` file. This file will save plots into the `Best_Plots` directory, and specifically `eval_model`. There are currently some plots from previous runs that have been documented in `bestmodels.md` so if wanting to run one of those models you should achieve the same results if you change the zip file that you are loading in to the appropriate name from `bestmodels.md` or if there is a newer model that you would like to run then go into the models directory and copy the relative path for the zip file. 
