@@ -3,13 +3,29 @@ Instead of manually installing the imporant packages create a duplicate conda en
 
 This yml file contains all the necessary packages in order to run the files outlined in the Getting Started Markdown File. Please follow the below steps in order to properly transfer this yml file to your machine as a new conda environment. 
 
-1. Deactivate your current conda environment in order to avoid any possible conflicts.
+1. Enter a Shell or Bash Terminal 
 
-2. Run the following command:
+2. While in the shell or bash terminal 
 
-` conda env create -f environment.yml `
+Deactivate your current conda environment in order to avoid any possible conflicts.
+However, if it is a new terminal window and there is no active environment then
+this step is not necessary.
 
-This process may take a while upwards of 5 minutes
+` conda deactivate `
+
+
+3. After ensuring that you are in a NON Anaconda Prompt terminal with NO active anaconda environment
+then proceeed to the directory where the environment.yml file is located.
+
+
+
+4. Once the environment.yml file has been located then run the following command:
+
+Before creating the environment either make this environment have a custom name, or ensure that Lettuce_GH_RL is not already an anaconda environment.
+
+`conda env create -f environment.yml `
+
+This process may take a while upwards of 5-10 minutes
 
 3. After you have your new conda environment activate it
 We have provided the environment a name for you in the yml file so use this name as provided unless you have initialized it when creating with a different name.
@@ -17,6 +33,14 @@ We have provided the environment a name for you in the yml file so use this name
 `conda activate Lettuce_GH_RL`
 
 4. Now that you have an activate environment please proceed back to the README markdown file to see what is available within this project.
+
+
+
+**Important: IF ENCOUNTERING ERRORS**
+
+1. Make sure to install the vs studio C++ components for testing openai environments
+2. If there are issues with the installation of stable baselines 3, then attempt the documentation in the installations markdown file. 
+
 
 
 
