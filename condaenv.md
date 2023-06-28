@@ -16,7 +16,7 @@ We have provided the environment a name for you in the yml file so use this name
 
 `conda activate Lettuce_GH_RL`
 
-4. Now that you have an activate environment please proceed back to the ReadME markdown file to see what is available within this project.
+4. Now that you have an activate environment please proceed back to the README markdown file to see what is available within this project.
 
 
 
