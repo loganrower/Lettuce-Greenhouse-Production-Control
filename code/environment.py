@@ -23,7 +23,7 @@ class LettuceGreenhouse(gym.Env):
         nu=3,                 # number of control inputs
         h=15*60,              # sampling period (15 minutes, 900 seconds...)
         c=86400,              # conversion to seconds
-        nDays= 7,              # simulation days
+        nDays= 40,              # simulation days
         Np=20,                # number of future predictions (20 == 5hrs)
         startDay= 150,          # start day of simulation random between 0 and 300..
         ):
@@ -290,7 +290,7 @@ class LettuceGreenhouse(gym.Env):
         cr_co2_1 = .1
         cr_co2_2 = .0005  
         ## Temperature Constants...
-        cr_t_1 = .001 *20 # changed this so we give more penalty for temp out of range....
+        cr_t_1 = .001 *15# changed this so we give more penalty for temp out of range....
         cr_t_2 = .0005
 
         ## Parameters for the Control

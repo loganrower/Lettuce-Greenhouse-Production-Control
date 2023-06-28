@@ -10,6 +10,10 @@ from stable_baselines3.common.results_plotter import load_results, ts2xy, plot_r
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 
+# Start the timer
+start_time = time.time()
+
+
 
 #os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 # The models directory
@@ -94,7 +98,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
             if mean_reward > self.best_mean_reward:
                 self.best_mean_reward = mean_reward
                 if self.save_path is not None:
-                    self.model.save(os.path.join(self.save_path, 'best_model'))
+                    self.model.save(os.path.join(self.save_path, 'best_model_net_prof_7'))
                     if self.verbose > 0:
                         print(f"Saved the best model with mean reward: {mean_reward:.2f}")
         return True
@@ -170,7 +174,7 @@ gh.reset()
 modelppo = PPO('MlpPolicy', gh,**hyperparameters,verbose=1, tensorboard_log=logdir)
 
 # # Timesteps
-TIMESTEPS = 20000
+TIMESTEPS = 50000
 # for i in range(5):
 # Pass the callback object to the model's `learn()` method
 modelppo.learn(total_timesteps=TIMESTEPS, callback = callback_best)
@@ -184,3 +188,12 @@ modelppo.learn(total_timesteps=TIMESTEPS, callback = callback_best)
 
 # modelppo.learn(total_timesteps=TIMESTEPS, callback=EvalCallback(eval_env = gh),
 #             tb_log_name="PPO Eric 2")
+
+# Stop the timer
+end_time = time.time()
+
+# Calculate the elapsed time
+elapsed_time = end_time - start_time
+
+# Print the elapsed time
+print("Elapsed time: {:.2f} seconds".format(elapsed_time))

@@ -8,15 +8,17 @@ from stable_baselines3.common.utils import set_random_seed
 import numpy as np
 from stable_baselines3.common.monitor import Monitor
 import copy
+import time
 # import numpy as np
-
+# Start the timer
+start_time = time.time()
 seed_value = 120 # Replace with your desired seed value
 set_random_seed(seed_value)
 
 # Loaded in the model that was desired
 ## This model version is the model that has +1, -1 reward and +100 reward at specific state
 #model = PPO.load("models_method2/1687571802/1687572264.zip")
-model = PPO.load("models/1687711646/best_model.zip")
+model = PPO.load("models/1687872671/best_model_40.zip")
 # create the evaluation environment ## Start Day range from 0 to 300
 ## only initialize random day once.... will then train over this period 10 times...
 eval_gh = LettuceGreenhouse()
@@ -184,3 +186,11 @@ ep_reward(timestep,ep_rewards)
 
 # mean_reward, std_reward = evaluate_policy(model, eval_gh, n_eval_episodes=10)
 # print(f"The mean reward is {mean_reward} and the standard deviation of the reward is {std_reward}")
+# Stop the timer
+end_time = time.time()
+
+# Calculate the elapsed time
+elapsed_time = end_time - start_time
+
+# Print the elapsed time
+print("Elapsed time: {:.2f} seconds".format(elapsed_time))

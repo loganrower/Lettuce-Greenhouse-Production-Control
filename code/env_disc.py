@@ -24,9 +24,9 @@ class LettuceGreenhouse(gym.Env):
                  nu=3,  # number of control inputs
                  h=15 * 60,  # sampling period (15 minutes, 900 seconds...)
                  c=86400,  # conversion to seconds
-                 nDays=14,  # simulation days
+                 nDays=7,  # simulation days
                  Np=20,  # number of future predictions (20 == 5hrs)
-                 startDay=0,  # start day of simulation
+                 startDay=150,  # start day of simulation
                  ):
         """
         Greenhouse environment class, implemented as an OpenAI gym environment.
@@ -149,7 +149,7 @@ class LettuceGreenhouse(gym.Env):
         print("New state: ", self.g())
         new_measurement = self.g()
         self.dry_weight_plot.append(new_measurement[0])
-        self.indoor_co2_plot.append(new_measurement[1])
+        self.indoor_co2_plot.append(self.state[1])
         self.temp_plot.append(new_measurement[2])
         self.rh_plot.append(new_measurement[3])
         self.timestep_plot.append(self.timestep)
@@ -206,12 +206,11 @@ class LettuceGreenhouse(gym.Env):
 
         # Calculate total revenue.
         if self.timestep == 0:
-            total_revenue = (abs(self.old_state[0] - obs[0]) * self.p["productPrice2"]) + self.p[
+            total_revenue = ((obs[0] - self.old_state[0]) * self.p["productPrice2"]) + self.p[
                 "productPrice1"]  # Auction Price of Lettuce €/m^2
         else:
-            # don't add p2
-            total_revenue = (abs(self.old_state[0] - obs[0])) * self.p[
-                "productPrice2"]  # Auction Price of Lettuce €/m^2
+            # don't add p1
+            total_revenue = (obs[0] - self.old_state[0]) * self.p["productPrice2"]  # Auction Price of Lettuce €/m^2
 
         # 2. return reward
         net_profit = float(total_revenue - total_expenses)
@@ -309,7 +308,7 @@ class LettuceGreenhouse(gym.Env):
         ## Then increase heating
 
         #### PUT BOUNDS SO DONT GO OUTSIDE ACTION SPACE....
-        low_th = -5.00  # C
+        low_th = 10.00  # C
         high_th = 20.0  # C
 
         #### PLACED BOUNDS SO THAT THE ACTIONS WERE NOT INCREASED
@@ -449,7 +448,7 @@ class LettuceGreenhouse(gym.Env):
         ax_5 = plt.subplot(5, 2, 5)
         plt.plot(self.timestep_plot, self.indoor_co2_plot)
         ax_5.set_xlabel('Time in 15 min steps')
-        ax_5.set_ylabel('Indoor CO¬2 concentration [ppm]')
+        ax_5.set_ylabel('Indoor CO¬2 concentration [kg/me-3]')
 
         ax_6 = plt.subplot(5, 2, 6)
         plt.plot(self.timestep_plot, self.temp_plot)

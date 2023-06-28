@@ -291,7 +291,7 @@ class LettuceGreenhouse(gym.Env):
         cr_co2_1 = .1
         cr_co2_2 = .0005  
         ## Temperature Constants...
-        cr_t_1 = .001 *20# # changed this so we give more penalty for temp out of range....
+        cr_t_1 = .001 *15# # changed this so we give more penalty for temp out of range....
         cr_t_2 = .0005
 
         ## Parameters for the Control
@@ -372,7 +372,7 @@ class LettuceGreenhouse(gym.Env):
 
         self.weight_change += (self.dryweight-self.old_state[0])
 
-        return reward
+        return net_profit
 
     
 
