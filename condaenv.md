@@ -9,14 +9,14 @@ This yml file contains all the necessary packages in order to run the files outl
 
 ` conda env create -f environment.yml `
 
-This process may take a while upwards of XX
+This process may take a while upwards of 5 minutes
 
 3. After you have your new conda environment activate it
 We have provided the environment a name for you in the yml file so use this name as provided unless you have initialized it when creating with a different name.
 
 `conda activate Lettuce_GH_RL`
 
-4. Now that you have an activate environment please proceed back to the Getting Started markdown file to see what is available within this project.
+4. Now that you have an activate environment please proceed back to the ReadME markdown file to see what is available within this project.
 
 
 
