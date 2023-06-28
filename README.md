@@ -62,5 +62,6 @@ Boersma S, van Mourik S. 2021. Nonlinear sample-based MPC in a Greenhouse with L
 
 
 **Report**
+
  If wanting to view the report on this project then see the report in the report directory. This report outlines various experiments that were conducted with these environments, and analyzes the various reward functions and methods performed. 
- 
+
