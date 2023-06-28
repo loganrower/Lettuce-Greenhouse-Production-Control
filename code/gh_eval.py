@@ -18,7 +18,7 @@ set_random_seed(seed_value)
 # Loaded in the model that was desired
 ## This model version is the model that has +1, -1 reward and +100 reward at specific state
 #model = PPO.load("models_method2/1687571802/1687572264.zip")
-model = PPO.load("models/1687872671/best_model_40.zip")
+model = PPO.load("models/1687711371/best_model.zip")
 # create the evaluation environment ## Start Day range from 0 to 300
 ## only initialize random day once.... will then train over this period 10 times...
 eval_gh = LettuceGreenhouse()
@@ -118,7 +118,7 @@ def ep_plots(timestep,dry_weight,indoor_co2,indoor_temp,rh,supply_co2,vent,suppl
     # ax_8.set_ylabel('Episode Rewards Over Time')
 
     # Save the figure:
-    plt.savefig(save_path + f'action_state_eval_plot_1.png')
+    plt.savefig(save_path + f'action_state_eval_plot.png')
     plt.close()  # Close the plot window after each plot
 
 ep_num = 100

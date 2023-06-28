@@ -1,8 +1,10 @@
-## Python Package Local Installation Instructions
+## Python Package Local Installation Instructions (OPTIONAL DOCUMENTATION)
 
 1. Make a new anaconda environment Python 10.x.x
 
 2. First install swig...
+   pip install -q swig
+
 3. First install the version of gym that will be used
     pip3 install git+https://github.com/Pythoniasm/gym-fork.git@fix-v0.21.0
 
@@ -32,11 +34,11 @@ conda install -c conda-forge xorg-libx11
  virtual display implementation similar to xvfb, and xorg-libx11 is a library required for X Window System compatibility.
 
     
-7. Install gym[box2D] for practice...
+7. OPTIONAL: Install gym[box2D] for practice...
     - using the older gym instead of gymnasium.....
     pip install gym[box2D]
 
-8. In order to get a visual for lets say the lunar lander we need to update the installation of pyglet...
+8. OPTIONAL: In order to get a visual for lets say the lunar lander we need to update the installation of pyglet...
     https://stackoverflow.com/questions/74314778/nameerror-name-glpushmatrix-is-not-defined 
     pip install pyglet==1.5.27
 
