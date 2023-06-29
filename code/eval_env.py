@@ -10,8 +10,8 @@ import numpy as np
 from utils import co2dens2ppm, vaporDens2rh, load_disturbances, DefineParameters
 import matplotlib.pyplot as plt
 import copy
-import gymnasium as gym
-from gymnasium import spaces
+import gym
+from gym import spaces
 
 class LettuceGreenhouse(gym.Env):
 
