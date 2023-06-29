@@ -1,4 +1,9 @@
 # Lettuce Greenhouse Production Control
+![alt text](https://img.agriexpo.online/images_ag/projects/images-g/exploring-ways-to-feed-future-autonomous-greenhouse-challenge-6831-15723631.jpg)
+
+
+
+
 Project for Advanced Machine Learning at Wageningen University 
 
 Authors of the Project: Bart van Laatum; Congcong Sun 
