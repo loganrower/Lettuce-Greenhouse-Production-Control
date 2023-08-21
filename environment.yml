@@ -232,4 +232,4 @@ dependencies:
     - torch==2.0.1
     - tqdm==4.65.0
     - widgetsnbextension==4.0.7
-prefix: C:\Users\lkrow\anaconda3\envs\TEST_Lettuce_GH
+
